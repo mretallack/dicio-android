@@ -7,8 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -126,59 +125,55 @@ fun EntityMappingsEditor(
     var showDialog by rememberSaveable { mutableStateOf(false) }
     var editIndex by rememberSaveable { mutableStateOf(-1) }
 
-    LazyColumn(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-        item {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = stringResource(R.string.pref_homeassistant_entity_mappings),
+            style = MaterialTheme.typography.titleMedium
+        )
+        IconButton(onClick = {
+            editIndex = -1
+            showDialog = true
+        }) {
+            Icon(Icons.Default.Add, contentDescription = stringResource(R.string.pref_homeassistant_add_mapping))
+        }
+    }
+
+    mappings.forEachIndexed { index, mapping ->
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp)
+                .clickable {
+                    editIndex = index
+                    showDialog = true
+                }
+        ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = stringResource(R.string.pref_homeassistant_entity_mappings),
-                    style = MaterialTheme.typography.titleMedium
-                )
-                IconButton(onClick = {
-                    editIndex = -1
-                    showDialog = true
-                }) {
-                    Icon(Icons.Default.Add, contentDescription = stringResource(R.string.pref_homeassistant_add_mapping))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = mapping.friendlyName,
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = mapping.entityId,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
-            }
-        }
-
-        itemsIndexed(mappings) { index, mapping ->
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp)
-                    .clickable {
-                        editIndex = index
-                        showDialog = true
-                    }
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = mapping.friendlyName,
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                        Text(
-                            text = mapping.entityId,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    IconButton(onClick = {
-                        onMappingsChange(mappings.filterIndexed { i, _ -> i != index })
-                    }) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete")
-                    }
+                IconButton(onClick = {
+                    onMappingsChange(mappings.filterIndexed { i, _ -> i != index })
+                }) {
+                    Icon(Icons.Default.Delete, contentDescription = "Delete")
                 }
             }
         }
