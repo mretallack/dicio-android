@@ -5,5 +5,7 @@ get_status:
   - is .entity_name. on|off
 
 set_state:
-  - (set|turn|switch) (the )?(home assistant |ha )?.entity_name. .action.
+  - (turn|switch) .entity_name. .action.
+  - (turn|switch) (the )?.entity_name. .action.
   - .action. (the )?.entity_name.
+  - .entity_name. .action.

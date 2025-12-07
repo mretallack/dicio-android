@@ -16,11 +16,15 @@ class HomeAssistantSkill(
 ) : StandardRecognizerSkill<HomeAssistant>(correspondingSkillInfo, data) {
 
     override suspend fun generateOutput(ctx: SkillContext, inputData: HomeAssistant): SkillOutput {
+        android.util.Log.d("HomeAssistantSkill", "generateOutput called with inputData: $inputData")
         val settings = ctx.android.homeAssistantDataStore.data.first()
         
         val entityName = when (inputData) {
             is HomeAssistant.GetStatus -> inputData.entityName ?: ""
-            is HomeAssistant.SetState -> inputData.entityName ?: ""
+            is HomeAssistant.SetState -> {
+                android.util.Log.d("HomeAssistantSkill", "SetState - entityName: '${inputData.entityName}', action: '${inputData.action}'")
+                inputData.entityName ?: ""
+            }
         }
         
         val mapping = findBestMatch(entityName, settings.entityMappingsList)
@@ -65,9 +69,15 @@ class HomeAssistantSkill(
         mapping: EntityMapping,
         action: String
     ): SkillOutput {
+        android.util.Log.d("HomeAssistantSkill", "handleSetState - action: '$action', entityId: '${mapping.entityId}'")
         val domain = mapping.entityId.substringBefore(".")
+        android.util.Log.d("HomeAssistantSkill", "Domain: '$domain'")
         val parsedAction = parseAction(action, domain)
-            ?: return HomeAssistantOutput.InvalidAction(action, domain)
+        if (parsedAction == null) {
+            android.util.Log.e("HomeAssistantSkill", "Failed to parse action: '$action'")
+            return HomeAssistantOutput.InvalidAction(action.ifEmpty { "<empty>" }, domain)
+        }
+        android.util.Log.d("HomeAssistantSkill", "Parsed action: service='${parsedAction.service}', spokenForm='${parsedAction.spokenForm}'")
         
         val service = when (domain) {
             "cover" -> when (parsedAction.service) {
@@ -113,13 +123,14 @@ class HomeAssistantSkill(
 
     private fun parseAction(action: String, domain: String): ParsedAction? {
         val normalized = action.lowercase().trim()
+        android.util.Log.d("HomeAssistantSkill", "parseAction - input: '$action', normalized: '$normalized'")
         
         return when {
-            normalized in listOf("on", "open", "unlock", "enable") ->
-                ParsedAction("turn_on", normalized)
-            normalized in listOf("off", "close", "lock", "disable") ->
-                ParsedAction("turn_off", normalized)
-            normalized.startsWith("toggle") ->
+            normalized.contains("on") || normalized in listOf("open", "unlock", "enable") ->
+                ParsedAction("turn_on", "on")
+            normalized.contains("off") || normalized in listOf("close", "lock", "disable") ->
+                ParsedAction("turn_off", "off")
+            normalized.contains("toggle") ->
                 ParsedAction("toggle", "toggled")
             else -> null
         }
