@@ -19,24 +19,41 @@ class HomeAssistantSkill(
         android.util.Log.d("HomeAssistantSkill", "generateOutput called with inputData: $inputData")
         val settings = ctx.android.homeAssistantDataStore.data.first()
         
-        val (entityName, action) = when (inputData) {
-            is HomeAssistant.GetStatus -> Pair(inputData.entityName ?: "", null)
-            is HomeAssistant.SetStateOn -> Pair(inputData.entityName ?: "", "on")
-            is HomeAssistant.SetStateOff -> Pair(inputData.entityName ?: "", "off")
-            is HomeAssistant.SetStateToggle -> Pair(inputData.entityName ?: "", "toggle")
-        }
-        
-        val mapping = findBestMatch(entityName, settings.entityMappingsList)
-            ?: return HomeAssistantOutput.EntityNotMapped(entityName)
-        
         return try {
             when (inputData) {
-                is HomeAssistant.GetStatus -> handleGetStatus(settings, mapping)
-                is HomeAssistant.SetStateOn, is HomeAssistant.SetStateOff, is HomeAssistant.SetStateToggle -> 
-                    handleSetState(settings, mapping, action!!)
+                is HomeAssistant.GetStatus -> {
+                    val entityName = inputData.entityName ?: ""
+                    val mapping = findBestMatch(entityName, settings.entityMappingsList)
+                        ?: return HomeAssistantOutput.EntityNotMapped(entityName)
+                    handleGetStatus(settings, mapping)
+                }
+                is HomeAssistant.GetPersonLocation -> {
+                    val personName = inputData.personName?.trim() ?: ""
+                    val mapping = findBestMatch(personName, settings.entityMappingsList)
+                        ?: return HomeAssistantOutput.EntityNotMapped(personName)
+                    handleGetStatus(settings, mapping)
+                }
+                is HomeAssistant.SetStateOn -> {
+                    val entityName = inputData.entityName ?: ""
+                    val mapping = findBestMatch(entityName, settings.entityMappingsList)
+                        ?: return HomeAssistantOutput.EntityNotMapped(entityName)
+                    handleSetState(settings, mapping, "on")
+                }
+                is HomeAssistant.SetStateOff -> {
+                    val entityName = inputData.entityName ?: ""
+                    val mapping = findBestMatch(entityName, settings.entityMappingsList)
+                        ?: return HomeAssistantOutput.EntityNotMapped(entityName)
+                    handleSetState(settings, mapping, "off")
+                }
+                is HomeAssistant.SetStateToggle -> {
+                    val entityName = inputData.entityName ?: ""
+                    val mapping = findBestMatch(entityName, settings.entityMappingsList)
+                        ?: return HomeAssistantOutput.EntityNotMapped(entityName)
+                    handleSetState(settings, mapping, "toggle")
+                }
             }
         } catch (e: FileNotFoundException) {
-            HomeAssistantOutput.EntityNotFound(mapping.entityId)
+            HomeAssistantOutput.EntityNotFound("unknown")
         } catch (e: Exception) {
             if (e.message?.contains("401") == true || e.message?.contains("403") == true) {
                 HomeAssistantOutput.AuthFailed()

@@ -140,4 +140,40 @@ class HomeAssistantSkillTest : StringSpec({
         val setState = inputData as Sentences.HomeAssistant.SetStateToggle
         setState.entityName?.trim() shouldBe "basement lights"
     }
+
+    "parse 'where is the person Mark'" {
+        val data = Sentences.HomeAssistant["en"]!!
+        val (score, inputData) = data.score("where is the person Mark")
+        
+        inputData.shouldBeInstanceOf<Sentences.HomeAssistant.GetPersonLocation>()
+        val getLocation = inputData as Sentences.HomeAssistant.GetPersonLocation
+        getLocation.personName?.trim() shouldBe "Mark"
+    }
+
+    "parse 'wheres the person Sarah'" {
+        val data = Sentences.HomeAssistant["en"]!!
+        val (score, inputData) = data.score("wheres the person Sarah")
+        
+        inputData.shouldBeInstanceOf<Sentences.HomeAssistant.GetPersonLocation>()
+        val getLocation = inputData as Sentences.HomeAssistant.GetPersonLocation
+        getLocation.personName?.trim() shouldBe "Sarah"
+    }
+
+    "parse 'whats John location'" {
+        val data = Sentences.HomeAssistant["en"]!!
+        val (score, inputData) = data.score("whats John location")
+        
+        inputData.shouldBeInstanceOf<Sentences.HomeAssistant.GetPersonLocation>()
+        val getLocation = inputData as Sentences.HomeAssistant.GetPersonLocation
+        getLocation.personName?.trim() shouldBe "John"
+    }
+
+    "parse 'what is Emily location'" {
+        val data = Sentences.HomeAssistant["en"]!!
+        val (score, inputData) = data.score("what is Emily location")
+        
+        inputData.shouldBeInstanceOf<Sentences.HomeAssistant.GetPersonLocation>()
+        val getLocation = inputData as Sentences.HomeAssistant.GetPersonLocation
+        getLocation.personName?.trim() shouldBe "Emily"
+    }
 })
