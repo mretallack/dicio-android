@@ -130,4 +130,40 @@ sealed interface HomeAssistantOutput : SkillOutput {
             R.string.skill_homeassistant_auth_failed
         )
     }
+
+    data class CallServiceSuccess(
+        val entityId: String,
+        val friendlyName: String,
+        val service: String,
+        val command: String
+    ) : HomeAssistantOutput {
+        override fun getSpeechOutput(ctx: SkillContext): String = ctx.getString(
+            R.string.skill_homeassistant_service_success,
+            command,
+            friendlyName
+        )
+
+        @Composable
+        override fun GraphicalOutput(ctx: SkillContext) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Text(
+                    text = friendlyName,
+                    style = MaterialTheme.typography.headlineMedium,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = ctx.getString(R.string.skill_homeassistant_service_success, command, ""),
+                    style = MaterialTheme.typography.bodyLarge,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
 }

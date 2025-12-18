@@ -9,3 +9,9 @@ set_state:
   - (turn|switch) (the )?.entity_name. .action.
   - .action. (the )?.entity_name.
   - .entity_name. .action.
+
+call_service:
+  - (send|press) .command. (on|to) (the )?.entity_name.
+  - press .command. (button )?(on|to) (the )?.entity_name.
+  - send .command. to (the )?.entity_name.
+  - execute .command. (on|to) (the )?.entity_name.

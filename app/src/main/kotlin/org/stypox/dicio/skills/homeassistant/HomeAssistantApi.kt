@@ -57,4 +57,32 @@ object HomeAssistantApi {
         
         return JSONArray(response)
     }
+
+    @Throws(IOException::class)
+    suspend fun callServiceWithData(
+        baseUrl: String,
+        token: String,
+        domain: String,
+        service: String,
+        entityId: String,
+        data: Map<String, Any>
+    ): JSONArray {
+        val connection = URL("$baseUrl/api/services/$domain/$service").openConnection() as HttpURLConnection
+        connection.requestMethod = "POST"
+        connection.setRequestProperty("Authorization", "Bearer $token")
+        connection.setRequestProperty("Content-Type", "application/json")
+        connection.doOutput = true
+        
+        val body = JSONObject().apply {
+            put("entity_id", entityId)
+            data.forEach { (key, value) -> put(key, value) }
+        }.toString()
+        connection.outputStream.write(body.toByteArray())
+        
+        val scanner = java.util.Scanner(connection.inputStream)
+        val response = scanner.useDelimiter("\\A").next()
+        scanner.close()
+        
+        return JSONArray(response)
+    }
 }

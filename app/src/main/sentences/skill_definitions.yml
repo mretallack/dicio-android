@@ -137,3 +137,11 @@ skills:
             type: string
           - id: action
             type: string
+      - id: call_service
+        captures:
+          - id: service_name
+            type: string
+          - id: entity_name
+            type: string
+          - id: command
+            type: string

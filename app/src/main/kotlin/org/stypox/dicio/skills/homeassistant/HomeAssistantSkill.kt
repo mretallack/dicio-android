@@ -34,6 +34,7 @@ class HomeAssistantSkill(
             when (inputData) {
                 is HomeAssistant.GetStatus -> handleGetStatus(settings, mapping)
                 is HomeAssistant.SetState -> handleSetState(settings, mapping, inputData.action ?: "")
+                is HomeAssistant.CallService -> handleCallService(settings, mapping, inputData.serviceName ?: "", inputData.command ?: "")
             }
         } catch (e: FileNotFoundException) {
             HomeAssistantOutput.EntityNotFound(mapping.entityId)
@@ -105,6 +106,32 @@ class HomeAssistantSkill(
             entityId = mapping.entityId,
             friendlyName = mapping.friendlyName,
             action = parsedAction.spokenForm
+        )
+    }
+
+    private suspend fun handleCallService(
+        settings: SkillSettingsHomeAssistant,
+        mapping: EntityMapping,
+        serviceName: String,
+        command: String
+    ): SkillOutput {
+        val domain = mapping.entityId.substringBefore(".")
+        val service = serviceName.ifEmpty { "send_command" }
+        
+        HomeAssistantApi.callServiceWithData(
+            settings.baseUrl,
+            settings.accessToken,
+            domain,
+            service,
+            mapping.entityId,
+            mapOf("command" to command)
+        )
+        
+        return HomeAssistantOutput.CallServiceSuccess(
+            entityId = mapping.entityId,
+            friendlyName = mapping.friendlyName,
+            service = service,
+            command = command
         )
     }
 
