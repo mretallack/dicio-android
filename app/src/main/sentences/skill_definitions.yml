@@ -147,3 +147,4 @@ skills:
         captures:
           - id: entity_name
             type: string
+      - id: get_help

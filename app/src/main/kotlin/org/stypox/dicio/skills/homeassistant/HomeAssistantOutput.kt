@@ -130,4 +130,32 @@ sealed interface HomeAssistantOutput : SkillOutput {
             R.string.skill_homeassistant_auth_failed
         )
     }
+
+    class HelpResponse : HomeAssistantOutput {
+        override fun getSpeechOutput(ctx: SkillContext): String = ctx.getString(
+            R.string.skill_homeassistant_help_speech
+        )
+
+        @Composable
+        override fun GraphicalOutput(ctx: SkillContext) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Text(
+                    text = ctx.getString(R.string.skill_homeassistant_help_title),
+                    style = MaterialTheme.typography.headlineMedium,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = ctx.getString(R.string.skill_homeassistant_help_content),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
 }

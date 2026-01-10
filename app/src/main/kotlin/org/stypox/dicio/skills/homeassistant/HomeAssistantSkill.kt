@@ -21,6 +21,9 @@ class HomeAssistantSkill(
         
         return try {
             when (inputData) {
+                is HomeAssistant.GetHelp -> {
+                    handleGetHelp()
+                }
                 is HomeAssistant.GetStatus -> {
                     val entityName = inputData.entityName ?: ""
                     val mapping = findBestMatch(entityName, settings.entityMappingsList)
@@ -61,6 +64,10 @@ class HomeAssistantSkill(
                 HomeAssistantOutput.ConnectionFailed()
             }
         }
+    }
+
+    private fun handleGetHelp(): SkillOutput {
+        return HomeAssistantOutput.HelpResponse()
     }
 
     private suspend fun handleGetStatus(
