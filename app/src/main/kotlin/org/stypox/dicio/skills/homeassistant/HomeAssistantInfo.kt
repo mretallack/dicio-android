@@ -77,7 +77,8 @@ object HomeAssistantInfo : SkillInfo("home_assistant") {
     )
 
     override val renderSettings: @Composable () -> Unit get() = @Composable {
-        val dataStore = LocalContext.current.homeAssistantDataStore
+        val context = LocalContext.current
+        val dataStore = context.homeAssistantDataStore
         val data by dataStore.data.collectAsState(SkillSettingsHomeAssistantSerializer.defaultValue)
         val scope = rememberCoroutineScope()
 
@@ -87,19 +88,16 @@ object HomeAssistantInfo : SkillInfo("home_assistant") {
             ).Render(
                 value = data.baseUrl,
                 onValueChange = { baseUrl ->
-                    android.util.Log.d("HomeAssistantInfo", "Attempting to save baseUrl: '$baseUrl'")
-                    // Use GlobalScope to avoid composition scope issues
-                    kotlinx.coroutines.GlobalScope.launch {
+                    android.util.Log.d("HomeAssistant", "Saving base URL: $baseUrl")
+                    kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
                         try {
-                            dataStore.updateData { currentData ->
-                                android.util.Log.d("HomeAssistantInfo", "Current baseUrl: '${currentData.baseUrl}', new baseUrl: '$baseUrl'")
-                                val updated = currentData.toBuilder().setBaseUrl(baseUrl).build()
-                                android.util.Log.d("HomeAssistantInfo", "Updated baseUrl: '${updated.baseUrl}'")
-                                updated
+                            dataStore.updateData {
+                                android.util.Log.d("HomeAssistant", "DataStore update started")
+                                it.toBuilder().setBaseUrl(baseUrl).build()
                             }
-                            android.util.Log.d("HomeAssistantInfo", "DataStore update completed")
+                            android.util.Log.d("HomeAssistant", "DataStore update completed")
                         } catch (e: Exception) {
-                            android.util.Log.e("HomeAssistantInfo", "Failed to update DataStore", e)
+                            android.util.Log.e("HomeAssistant", "Failed to save base URL", e)
                         }
                     }
                 }
@@ -110,23 +108,20 @@ object HomeAssistantInfo : SkillInfo("home_assistant") {
             ).Render(
                 value = data.accessToken,
                 onValueChange = { token ->
-                    kotlinx.coroutines.GlobalScope.launch {
-                        dataStore.updateData {
-                            it.toBuilder().setAccessToken(token).build()
+                    android.util.Log.d("HomeAssistant", "Saving access token (length: ${token.length})")
+                    kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+                        try {
+                            dataStore.updateData {
+                                android.util.Log.d("HomeAssistant", "DataStore update started")
+                                it.toBuilder().setAccessToken(token).build()
+                            }
+                            android.util.Log.d("HomeAssistant", "DataStore update completed")
+                        } catch (e: Exception) {
+                            android.util.Log.e("HomeAssistant", "Failed to save access token", e)
                         }
                     }
                 }
             )
-
-            // Initialize default templates if empty
-            if (data.serviceTemplatesList.isEmpty()) {
-                scope.launch {
-                    dataStore.updateData {
-                        val defaultTemplates = ServiceTemplateManager().getDefaultTemplates()
-                        it.toBuilder().addAllServiceTemplates(defaultTemplates).build()
-                    }
-                }
-            }
 
             EntityMappingsEditor(
                 mappings = data.entityMappingsList,
@@ -217,12 +212,9 @@ fun EntityMappingsEditor(
             initialMapping = if (editIndex >= 0) mappings[editIndex] else null,
             onDismiss = { showDialog = false },
             onSave = { friendlyName, entityId ->
-                val domain = entityId.substringBefore(".")
                 val newMapping = EntityMapping.newBuilder()
                     .setFriendlyName(friendlyName)
                     .setEntityId(entityId)
-                    .setDomain(domain)
-                    .setEnabled(true)
                     .build()
                 
                 val newMappings = if (editIndex >= 0) {
@@ -355,6 +347,18 @@ fun EntityPickerDialog(
     onDismiss: () -> Unit,
     onSelect: (String, String) -> Unit
 ) {
+    var searchQuery by remember { mutableStateOf("") }
+    val filteredEntities = remember(entities, searchQuery) {
+        if (searchQuery.isBlank()) {
+            entities
+        } else {
+            entities.filter { (id, name) ->
+                id.contains(searchQuery, ignoreCase = true) ||
+                name.contains(searchQuery, ignoreCase = true)
+            }
+        }
+    }
+
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -364,13 +368,21 @@ fun EntityPickerDialog(
                 Text(
                     text = "Select Entity",
                     style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                )
+
+                TextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    label = { Text("Search") },
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    singleLine = true
                 )
                 
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().weight(1f, false)
                 ) {
-                    items(entities) { (id, name) ->
+                    items(filteredEntities) { (id, name) ->
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()

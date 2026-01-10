@@ -131,11 +131,21 @@ skills:
         captures:
           - id: entity_name
             type: string
-      - id: set_state
+      - id: get_person_location
+        captures:
+          - id: person_name
+            type: string
+      - id: set_state_on
         captures:
           - id: entity_name
             type: string
-          - id: action
+      - id: set_state_off
+        captures:
+          - id: entity_name
+            type: string
+      - id: set_state_toggle
+        captures:
+          - id: entity_name
             type: string
       - id: call_service
         captures:

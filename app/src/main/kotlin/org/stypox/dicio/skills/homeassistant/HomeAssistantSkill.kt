@@ -15,109 +15,51 @@ class HomeAssistantSkill(
     data: StandardRecognizerData<HomeAssistant>
 ) : StandardRecognizerSkill<HomeAssistant>(correspondingSkillInfo, data) {
 
-    private val serviceTemplateManager = ServiceTemplateManager()
-    private val quickActionManager = QuickActionManager()
-
     override suspend fun generateOutput(ctx: SkillContext, inputData: HomeAssistant): SkillOutput {
         android.util.Log.d("HomeAssistantSkill", "generateOutput called with inputData: $inputData")
         val settings = ctx.android.homeAssistantDataStore.data.first()
         
-        val entityName = when (inputData) {
-            is HomeAssistant.GetStatus -> inputData.entityName ?: ""
-            is HomeAssistant.SetState -> {
-                android.util.Log.d("HomeAssistantSkill", "SetState - entityName: '${inputData.entityName}', action: '${inputData.action}'")
-                inputData.entityName ?: ""
-            }
-            is HomeAssistant.CallService -> inputData.entityName ?: ""
-        }
-        
-        // First check for quick actions
-        val fullInput = "$entityName ${when (inputData) {
-            is HomeAssistant.SetState -> inputData.action ?: ""
-            is HomeAssistant.CallService -> "${inputData.serviceName ?: ""} ${inputData.command ?: ""}"
-            else -> ""
-        }}".trim()
-        
-        val quickAction = quickActionManager.findQuickActionByTrigger(fullInput, settings.quickActionsList)
-        if (quickAction != null) {
-            return handleQuickAction(settings, quickAction)
-        }
-        
-        // Then check for service templates
-        val templates = settings.serviceTemplatesList.ifEmpty { serviceTemplateManager.getDefaultTemplates() }
-        val templateMatch = serviceTemplateManager.findMatchingTemplate(fullInput, templates, settings.entityMappingsList)
-        if (templateMatch != null) {
-            return handleServiceTemplate(settings, templateMatch)
-        }
-        
-        // Fall back to original entity mapping logic
-        val mapping = findBestMatch(entityName, settings.entityMappingsList)
-            ?: return HomeAssistantOutput.EntityNotMapped(entityName)
-        
         return try {
             when (inputData) {
-                is HomeAssistant.GetStatus -> handleGetStatus(settings, mapping)
-                is HomeAssistant.SetState -> handleSetState(settings, mapping, inputData.action ?: "")
-                is HomeAssistant.CallService -> handleCallService(settings, mapping, inputData.serviceName ?: "", inputData.command ?: "")
+                is HomeAssistant.GetStatus -> {
+                    val entityName = inputData.entityName ?: ""
+                    val mapping = findBestMatch(entityName, settings.entityMappingsList)
+                        ?: return HomeAssistantOutput.EntityNotMapped(entityName)
+                    handleGetStatus(settings, mapping)
+                }
+                is HomeAssistant.GetPersonLocation -> {
+                    val personName = inputData.personName?.trim() ?: ""
+                    val mapping = findBestMatch(personName, settings.entityMappingsList)
+                        ?: return HomeAssistantOutput.EntityNotMapped(personName)
+                    handleGetStatus(settings, mapping)
+                }
+                is HomeAssistant.SetStateOn -> {
+                    val entityName = inputData.entityName ?: ""
+                    val mapping = findBestMatch(entityName, settings.entityMappingsList)
+                        ?: return HomeAssistantOutput.EntityNotMapped(entityName)
+                    handleSetState(settings, mapping, "on")
+                }
+                is HomeAssistant.SetStateOff -> {
+                    val entityName = inputData.entityName ?: ""
+                    val mapping = findBestMatch(entityName, settings.entityMappingsList)
+                        ?: return HomeAssistantOutput.EntityNotMapped(entityName)
+                    handleSetState(settings, mapping, "off")
+                }
+                is HomeAssistant.SetStateToggle -> {
+                    val entityName = inputData.entityName ?: ""
+                    val mapping = findBestMatch(entityName, settings.entityMappingsList)
+                        ?: return HomeAssistantOutput.EntityNotMapped(entityName)
+                    handleSetState(settings, mapping, "toggle")
+                }
             }
         } catch (e: FileNotFoundException) {
-            HomeAssistantOutput.EntityNotFound(mapping.entityId)
+            HomeAssistantOutput.EntityNotFound("unknown")
         } catch (e: Exception) {
             if (e.message?.contains("401") == true || e.message?.contains("403") == true) {
                 HomeAssistantOutput.AuthFailed()
             } else {
                 HomeAssistantOutput.ConnectionFailed()
             }
-        }
-    }
-
-    private suspend fun handleQuickAction(
-        settings: SkillSettingsHomeAssistant,
-        quickAction: QuickAction
-    ): SkillOutput {
-        return try {
-            val templates = settings.serviceTemplatesList.ifEmpty { serviceTemplateManager.getDefaultTemplates() }
-            val result = quickActionManager.executeQuickAction(
-                settings.baseUrl,
-                settings.accessToken,
-                quickAction,
-                templates,
-                settings.entityMappingsList
-            )
-            
-            if (result.success) {
-                HomeAssistantOutput.QuickActionSuccess(quickAction.name, result.message)
-            } else {
-                HomeAssistantOutput.QuickActionFailed(quickAction.name, result.message)
-            }
-        } catch (e: Exception) {
-            HomeAssistantOutput.QuickActionFailed(quickAction.name, e.message ?: "Unknown error")
-        }
-    }
-    
-    private suspend fun handleServiceTemplate(
-        settings: SkillSettingsHomeAssistant,
-        templateMatch: ServiceTemplateManager.TemplateMatch
-    ): SkillOutput {
-        return try {
-            HomeAssistantApi.callServiceWithTemplate(
-                settings.baseUrl,
-                settings.accessToken,
-                templateMatch.template,
-                templateMatch.entityId,
-                templateMatch.parameters
-            )
-            
-            HomeAssistantOutput.ServiceTemplateSuccess(
-                templateMatch.template.friendlyName,
-                templateMatch.entityId ?: "system",
-                templateMatch.parameters
-            )
-        } catch (e: Exception) {
-            HomeAssistantOutput.ServiceTemplateFailed(
-                templateMatch.template.friendlyName,
-                e.message ?: "Unknown error"
-            )
         }
     }
 
@@ -180,32 +122,6 @@ class HomeAssistantSkill(
             entityId = mapping.entityId,
             friendlyName = mapping.friendlyName,
             action = parsedAction.spokenForm
-        )
-    }
-
-    private suspend fun handleCallService(
-        settings: SkillSettingsHomeAssistant,
-        mapping: EntityMapping,
-        serviceName: String,
-        command: String
-    ): SkillOutput {
-        val domain = mapping.entityId.substringBefore(".")
-        val service = serviceName.ifEmpty { "send_command" }
-        
-        HomeAssistantApi.callServiceWithData(
-            settings.baseUrl,
-            settings.accessToken,
-            domain,
-            service,
-            mapping.entityId,
-            mapOf("command" to command)
-        )
-        
-        return HomeAssistantOutput.CallServiceSuccess(
-            entityId = mapping.entityId,
-            friendlyName = mapping.friendlyName,
-            service = service,
-            command = command
         )
     }
 
