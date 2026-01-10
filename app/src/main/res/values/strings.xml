@@ -250,6 +250,7 @@
     <string name="skill_sentence_example_home_assistant">Turn living room light on</string>
     <string name="skill_homeassistant_entity_state">%1$s is %2$s</string>
     <string name="skill_homeassistant_set_success">%1$s turned %2$s</string>
+    <string name="skill_homeassistant_service_success">Service %1$s called successfully</string>
     <string name="skill_homeassistant_invalid_action">Cannot %1$s a %2$s</string>
     <string name="skill_homeassistant_entity_not_mapped">I don\'t have a mapping for %1$s</string>
     <string name="skill_homeassistant_entity_not_found">Entity %1$s not found in Home Assistant</string>

@@ -166,4 +166,59 @@ sealed interface HomeAssistantOutput : SkillOutput {
             }
         }
     }
+
+    data class ServiceTemplateSuccess(
+        val templateName: String,
+        val entityId: String,
+        val parameters: Map<String, String>
+    ) : HomeAssistantOutput {
+        override fun getSpeechOutput(ctx: SkillContext): String = 
+            "Successfully executed $templateName on $entityId"
+
+        @Composable
+        override fun GraphicalOutput(ctx: SkillContext) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Text(
+                    text = templateName,
+                    style = MaterialTheme.typography.headlineMedium,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Parameters: ${parameters.entries.joinToString { "${it.key}: ${it.value}" }}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
+
+    data class ServiceTemplateFailed(
+        val templateName: String,
+        val error: String
+    ) : HomeAssistantOutput, HeadlineSpeechSkillOutput {
+        override fun getSpeechOutput(ctx: SkillContext): String = 
+            "Failed to execute $templateName: $error"
+    }
+
+    data class QuickActionSuccess(
+        val actionName: String,
+        val message: String
+    ) : HomeAssistantOutput, HeadlineSpeechSkillOutput {
+        override fun getSpeechOutput(ctx: SkillContext): String = message
+    }
+
+    data class QuickActionFailed(
+        val actionName: String,
+        val error: String
+    ) : HomeAssistantOutput, HeadlineSpeechSkillOutput {
+        override fun getSpeechOutput(ctx: SkillContext): String = 
+            "Failed to execute $actionName: $error"
+    }
 }

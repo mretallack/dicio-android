@@ -87,9 +87,19 @@ object HomeAssistantInfo : SkillInfo("home_assistant") {
             ).Render(
                 value = data.baseUrl,
                 onValueChange = { baseUrl ->
-                    scope.launch {
-                        dataStore.updateData {
-                            it.toBuilder().setBaseUrl(baseUrl).build()
+                    android.util.Log.d("HomeAssistantInfo", "Attempting to save baseUrl: '$baseUrl'")
+                    // Use GlobalScope to avoid composition scope issues
+                    kotlinx.coroutines.GlobalScope.launch {
+                        try {
+                            dataStore.updateData { currentData ->
+                                android.util.Log.d("HomeAssistantInfo", "Current baseUrl: '${currentData.baseUrl}', new baseUrl: '$baseUrl'")
+                                val updated = currentData.toBuilder().setBaseUrl(baseUrl).build()
+                                android.util.Log.d("HomeAssistantInfo", "Updated baseUrl: '${updated.baseUrl}'")
+                                updated
+                            }
+                            android.util.Log.d("HomeAssistantInfo", "DataStore update completed")
+                        } catch (e: Exception) {
+                            android.util.Log.e("HomeAssistantInfo", "Failed to update DataStore", e)
                         }
                     }
                 }
@@ -100,13 +110,23 @@ object HomeAssistantInfo : SkillInfo("home_assistant") {
             ).Render(
                 value = data.accessToken,
                 onValueChange = { token ->
-                    scope.launch {
+                    kotlinx.coroutines.GlobalScope.launch {
                         dataStore.updateData {
                             it.toBuilder().setAccessToken(token).build()
                         }
                     }
                 }
             )
+
+            // Initialize default templates if empty
+            if (data.serviceTemplatesList.isEmpty()) {
+                scope.launch {
+                    dataStore.updateData {
+                        val defaultTemplates = ServiceTemplateManager().getDefaultTemplates()
+                        it.toBuilder().addAllServiceTemplates(defaultTemplates).build()
+                    }
+                }
+            }
 
             EntityMappingsEditor(
                 mappings = data.entityMappingsList,
@@ -197,9 +217,12 @@ fun EntityMappingsEditor(
             initialMapping = if (editIndex >= 0) mappings[editIndex] else null,
             onDismiss = { showDialog = false },
             onSave = { friendlyName, entityId ->
+                val domain = entityId.substringBefore(".")
                 val newMapping = EntityMapping.newBuilder()
                     .setFriendlyName(friendlyName)
                     .setEntityId(entityId)
+                    .setDomain(domain)
+                    .setEnabled(true)
                     .build()
                 
                 val newMappings = if (editIndex >= 0) {

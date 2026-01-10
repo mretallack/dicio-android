@@ -33,15 +33,22 @@ Natural language patterns are defined in `home_assistant.yml` with flexible synt
 - "Check [entity] status"
 - "Is [entity] on or off?"
 
-**State Control:**
+**Simple State Control:**
 - "Turn [entity] on/off"
 - "Switch [entity] on/off"
 - "[Action] the [entity]"
 
-**Service Calls:**
-- "Press [command] on [entity]"
-- "Send [command] to [entity]"
-- "Execute [command] on [entity]"
+**Service Template Commands:**
+- "Set [entity] to [value] percent" → Uses light_brightness template
+- "Set [entity] volume to [number]" → Uses media_volume template
+- "Press [command] on [entity]" → Uses remote_command template
+- "Play [playlist] on [entity]" → Uses media_playlist template
+
+**Quick Action Commands:**
+- "Movie time" → Executes pre-configured movie scene
+- "Good night" → Runs bedtime automation
+- "Welcome home" → Activates arrival scene
+- "[Custom phrase]" → Any user-defined quick action
 
 ### Entity Management
 
@@ -52,12 +59,34 @@ Natural language patterns are defined in `home_assistant.yml` with flexible synt
 
 ### Configuration UI
 
-Comprehensive settings interface built with Jetpack Compose:
+**Dedicated Home Assistant Settings Page**
+
+The current flat settings structure doesn't scale well for complex Home Assistant configurations. A dedicated settings page provides better organization and user experience:
+
+**Main Settings Screen:**
 - Base URL configuration for Home Assistant instance
 - Access token management for API authentication
-- Entity mapping editor with add/edit/delete functionality
-- Entity picker dialog with live entity discovery
-- Persistent storage using Protocol Buffers and DataStore
+- "Configure Home Assistant" button leading to dedicated settings page
+
+**Dedicated Home Assistant Settings Page:**
+- **Entity Management Tab**: Visual entity browser with categories (lights, switches, sensors, etc.)
+- **Voice Mappings Tab**: Configure friendly names for voice recognition
+- **Service Configurations Tab**: Pre-configure complex service calls with parameters
+- **Quick Actions Tab**: Set up common automation shortcuts
+
+**Enhanced Entity Management:**
+- Live entity discovery with automatic categorization by domain
+- Bulk import of entities with suggested friendly names
+- Entity status preview and testing
+- Search and filter capabilities
+- Domain-specific configuration options
+
+**Service Call Configuration:**
+- Template system for complex service calls with parameters
+- Parameter validation and type checking
+- Test service calls directly from settings
+- Save frequently used service configurations as voice shortcuts
+- Support for dynamic parameters (e.g., volume levels, colors, temperatures)
 
 ### Error Handling
 
@@ -78,15 +107,146 @@ Direct integration with Home Assistant REST API:
 
 Authentication via Bearer token with proper HTTP headers and JSON content handling.
 
+## Enhanced Settings Architecture
+
+### Current Limitations
+
+The existing settings system has several scalability issues:
+- Flat entity mapping structure doesn't handle complex service parameters
+- No support for service call templates or parameter validation
+- Limited organization for users with many entities
+- No way to pre-configure complex service calls with multiple parameters
+
+### Proposed Settings Structure
+
+**Updated Protocol Buffer Schema:**
+
+```protobuf
+message SkillSettingsHomeAssistant {
+  string base_url = 1;
+  string access_token = 2;
+  repeated EntityMapping entity_mappings = 3;
+  repeated ServiceTemplate service_templates = 4;
+  repeated QuickAction quick_actions = 5;
+  EntityDisplaySettings display_settings = 6;
+}
+
+message EntityMapping {
+  string friendly_name = 1;
+  string entity_id = 2;
+  string domain = 3;
+  bool enabled = 4;
+  repeated string aliases = 5;
+}
+
+message ServiceTemplate {
+  string name = 1;
+  string friendly_name = 2;
+  string domain = 3;
+  string service = 4;
+  repeated ServiceParameter parameters = 5;
+  bool requires_entity = 6;
+}
+
+message ServiceParameter {
+  string key = 1;
+  string value_type = 2; // "string", "number", "boolean", "dynamic"
+  string default_value = 3;
+  bool required = 4;
+  string description = 5;
+}
+
+message QuickAction {
+  string name = 1;
+  string voice_trigger = 2;
+  string service_template_name = 3;
+  string target_entity = 4;
+  map<string, string> parameter_values = 5;
+}
+
+message EntityDisplaySettings {
+  repeated string hidden_domains = 1;
+  string sort_order = 2; // "alphabetical", "domain", "recent"
+  bool show_unavailable = 3;
+}
+```
+
+### Three-Tier Command System
+
+**1. Simple State Control (Existing)**
+- Direct on/off/toggle commands
+- Status queries
+- Works with current entity mapping system
+
+**2. Service Call Templates**
+- Pre-configured service calls with parameter templates
+- Examples: "Set living room light to 50% brightness", "Play jazz playlist on kitchen speaker"
+- Parameters can be static or dynamic (extracted from voice command)
+
+**3. Quick Actions**
+- One-phrase shortcuts for complex operations
+- Examples: "Movie time" → dim lights, close blinds, turn on TV, set volume
+- Combines multiple service calls into single voice command
+
 ## Technical Implementation
 
-### Data Flow
+### Enhanced Data Flow
 
-1. User speaks command → Speech-to-text conversion
-2. Sentence matching → Extract entity name and action
-3. Entity resolution → Find matching configured entity
-4. API call → Execute Home Assistant REST API request
-5. Response processing → Generate speech and UI output
+1. **User speaks command** → Speech-to-text conversion
+2. **Command classification** → Determine if simple state, service template, or quick action
+3. **Parameter extraction** → Parse dynamic values from voice input
+4. **Entity/template resolution** → Find matching configured entity or service template
+5. **API call construction** → Build appropriate Home Assistant REST API request
+6. **Response processing** → Generate speech and UI output
+
+### Service Template Processing
+
+**Template Matching:**
+- Voice pattern recognition for service templates
+- Dynamic parameter extraction (numbers, colors, names)
+- Fallback to entity state control if no template matches
+
+**Parameter Handling:**
+- Type validation for extracted parameters
+- Default value substitution for missing optional parameters
+- Error handling for invalid or missing required parameters
+
+**Example Service Templates:**
+
+```yaml
+# Media control template
+- name: "media_volume"
+  friendly_name: "Set Volume"
+  domain: "media_player"
+  service: "volume_set"
+  parameters:
+    - key: "volume_level"
+      value_type: "number"
+      required: true
+      description: "Volume level (0.0-1.0)"
+
+# Light brightness template  
+- name: "light_brightness"
+  friendly_name: "Set Brightness"
+  domain: "light"
+  service: "turn_on"
+  parameters:
+    - key: "brightness_pct"
+      value_type: "number"
+      required: true
+      description: "Brightness percentage (0-100)"
+
+# Remote control template
+- name: "remote_command"
+  friendly_name: "Remote Control"
+  domain: "remote"
+  service: "send_command"
+  parameters:
+    - key: "command"
+      value_type: "string"
+      required: true
+      description: "Remote control command"
+```
 
 ### Action Parsing
 
@@ -112,10 +272,12 @@ The skill integrates seamlessly with Dicio's architecture:
 ## Benefits
 
 1. **Privacy-First**: All processing happens on-device except API calls to user's own Home Assistant instance
-2. **Flexible Configuration**: Users can customize entity mappings to match their speaking preferences
-3. **Comprehensive Coverage**: Supports all Home Assistant entity types through generic action system
-4. **User-Friendly**: Intuitive setup with entity discovery and visual configuration
-5. **Robust**: Comprehensive error handling and graceful degradation
+2. **Scalable Configuration**: Dedicated settings page handles complex configurations without cluttering main settings
+3. **Flexible Service Calls**: Template system supports any Home Assistant service with proper parameter handling
+4. **User-Friendly Setup**: Intuitive configuration with entity discovery, service templates, and quick actions
+5. **Comprehensive Coverage**: Supports simple controls, complex service calls, and multi-step automations
+6. **Robust Error Handling**: Comprehensive validation and graceful degradation
+7. **Performance Optimized**: Efficient caching and batch operations for large entity lists
 
 ## Recent Enhancements
 
@@ -125,9 +287,11 @@ The skill integrates seamlessly with Dicio's architecture:
 
 ## Future Enhancements
 
-- Support for entity attributes and complex state queries
-- Batch operations for multiple entities
-- Scene and automation triggering
-- Integration with Home Assistant's conversation API
-- Support for numeric values and dimming controls
-- Custom service parameter mapping
+- **Advanced Parameter Types**: Support for color values, time ranges, and complex data structures
+- **Conditional Logic**: Template parameters based on entity state or time conditions
+- **Batch Operations**: Execute multiple service calls in sequence or parallel
+- **Scene Integration**: Direct voice control for Home Assistant scenes and scripts
+- **Conversation API**: Integration with Home Assistant's native conversation system
+- **Machine Learning**: Adaptive parameter suggestions based on usage patterns
+- **Voice Feedback**: Customizable response templates for different service call results
+- **Integration Testing**: Built-in connectivity and service call testing tools
