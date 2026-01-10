@@ -14,3 +14,7 @@ set_state_off:
 
 set_state_toggle:
   - (turn|switch) (the )?.entity_name. toggle
+
+call_service:
+  - .service_name. .entity_name. .command.
+  - call .service_name. on .entity_name. with .command.

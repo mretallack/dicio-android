@@ -51,6 +51,14 @@ class HomeAssistantSkill(
                         ?: return HomeAssistantOutput.EntityNotMapped(entityName)
                     handleSetState(settings, mapping, "toggle")
                 }
+                is HomeAssistant.CallService -> {
+                    val serviceName = inputData.serviceName ?: ""
+                    val entityName = inputData.entityName ?: ""
+                    val command = inputData.command ?: ""
+                    val mapping = findBestMatch(entityName, settings.entityMappingsList)
+                        ?: return HomeAssistantOutput.EntityNotMapped(entityName)
+                    handleCallService(settings, mapping, serviceName, command)
+                }
             }
         } catch (e: FileNotFoundException) {
             HomeAssistantOutput.EntityNotFound("unknown")
@@ -133,6 +141,36 @@ class HomeAssistantSkill(
         return mappings.firstOrNull {
             it.friendlyName.lowercase().contains(normalized) ||
             normalized.contains(it.friendlyName.lowercase())
+        }
+    }
+
+    private suspend fun handleCallService(
+        settings: SkillSettingsHomeAssistant,
+        mapping: EntityMapping,
+        serviceName: String,
+        command: String
+    ): SkillOutput {
+        return try {
+            val domain = serviceName.substringBefore(".")
+            val service = serviceName.substringAfter(".")
+            
+            HomeAssistantApi.callService(
+                settings.baseUrl,
+                settings.accessToken,
+                domain,
+                service,
+                mapping.entityId
+            )
+            
+            HomeAssistantOutput.CallServiceSuccess(
+                mapping.entityId,
+                mapping.friendlyName,
+                service,
+                command
+            )
+        } catch (e: Exception) {
+            android.util.Log.e("HomeAssistantSkill", "Failed to call service", e)
+            HomeAssistantOutput.ConnectionFailed()
         }
     }
 
