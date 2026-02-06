@@ -346,6 +346,514 @@ The fuzzy matching uses a three-tier approach:
 
 ### Unit Tests
 
+#### 1. Fuzzy Matching Tests (`HomeAssistantSkillTest.kt`)
+
+**Test Class:** `SelectSourceFuzzyMatchingTest`
+
+```kotlin
+@Test
+fun `exact match - case insensitive`() {
+    val available = listOf("BBC Radio 2", "BBC Radio 4", "Spotify")
+    val result = findBestSourceMatch("bbc radio 2", available)
+    assertEquals("BBC Radio 2", result)
+}
+
+@Test
+fun `partial match - user says shortened name`() {
+    val available = listOf("BBC Radio 2", "BBC Radio 4", "Spotify")
+    val result = findBestSourceMatch("radio 2", available)
+    assertEquals("BBC Radio 2", result)
+}
+
+@Test
+fun `fuzzy match - number as word`() {
+    val available = listOf("BBC Radio 2", "BBC Radio 4", "Spotify")
+    val result = findBestSourceMatch("BBC Radio Two", available)
+    assertEquals("BBC Radio 2", result)
+}
+
+@Test
+fun `fuzzy match - phonetic spelling`() {
+    val available = listOf("BBC Radio 2", "BBC Radio 4", "Spotify")
+    val result = findBestSourceMatch("bee bee see radio 2", available)
+    assertEquals("BBC Radio 2", result)
+}
+
+@Test
+fun `fuzzy match - missing words`() {
+    val available = listOf("BBC Radio 2", "BBC Radio 4", "Spotify")
+    val result = findBestSourceMatch("radio two", available)
+    assertEquals("BBC Radio 2", result)
+}
+
+@Test
+fun `fuzzy match - extra words`() {
+    val available = listOf("BBC Radio 2", "BBC Radio 4", "Spotify")
+    val result = findBestSourceMatch("the BBC Radio 2 station", available)
+    assertEquals("BBC Radio 2", result)
+}
+
+@Test
+fun `no match - completely different`() {
+    val available = listOf("BBC Radio 2", "BBC Radio 4", "Spotify")
+    val result = findBestSourceMatch("Netflix", available)
+    assertNull(result)
+}
+
+@Test
+fun `no match - below threshold`() {
+    val available = listOf("BBC Radio 2", "BBC Radio 4", "Spotify")
+    val result = findBestSourceMatch("xyz", available)
+    assertNull(result)
+}
+
+@Test
+fun `ambiguous match - returns best score`() {
+    val available = listOf("BBC Radio 2", "BBC Radio 4", "BBC Radio 6 Music")
+    val result = findBestSourceMatch("BBC Radio", available)
+    assertNotNull(result)
+    assertTrue(result in available)
+}
+
+@Test
+fun `empty source list`() {
+    val available = emptyList<String>()
+    val result = findBestSourceMatch("BBC Radio 2", available)
+    assertNull(result)
+}
+
+@Test
+fun `empty requested source`() {
+    val available = listOf("BBC Radio 2", "BBC Radio 4")
+    val result = findBestSourceMatch("", available)
+    assertNull(result)
+}
+
+@Test
+fun `special characters in source name`() {
+    val available = listOf("80's Hits", "90's Rock", "Today's Top 40")
+    val result = findBestSourceMatch("80s hits", available)
+    assertEquals("80's Hits", result)
+}
+
+@Test
+fun `unicode characters in source name`() {
+    val available = listOf("Café del Mar", "Música Latina", "Rock")
+    val result = findBestSourceMatch("cafe del mar", available)
+    assertEquals("Café del Mar", result)
+}
+```
+
+#### 2. Source List Extraction Tests
+
+```kotlin
+@Test
+fun `extract source_list from valid state`() {
+    val state = JSONObject("""
+        {
+            "entity_id": "media_player.kitchen_radio",
+            "state": "playing",
+            "attributes": {
+                "source_list": ["BBC Radio 2", "BBC Radio 4", "Spotify"]
+            }
+        }
+    """)
+    
+    val sourceList = extractSourceList(state)
+    assertEquals(3, sourceList.size)
+    assertTrue(sourceList.contains("BBC Radio 2"))
+}
+
+@Test
+fun `extract source_list - empty array`() {
+    val state = JSONObject("""
+        {
+            "entity_id": "media_player.kitchen_radio",
+            "state": "playing",
+            "attributes": {
+                "source_list": []
+            }
+        }
+    """)
+    
+    val sourceList = extractSourceList(state)
+    assertTrue(sourceList.isEmpty())
+}
+
+@Test
+fun `extract source_list - missing attribute`() {
+    val state = JSONObject("""
+        {
+            "entity_id": "media_player.kitchen_radio",
+            "state": "playing",
+            "attributes": {}
+        }
+    """)
+    
+    val sourceList = extractSourceList(state)
+    assertNull(sourceList)
+}
+
+@Test
+fun `extract source_list - null attributes`() {
+    val state = JSONObject("""
+        {
+            "entity_id": "media_player.kitchen_radio",
+            "state": "playing"
+        }
+    """)
+    
+    val sourceList = extractSourceList(state)
+    assertNull(sourceList)
+}
+```
+
+#### 3. Error Handling Tests
+
+```kotlin
+@Test
+fun `handleSelectSource - entity not mapped`() = runTest {
+    val result = skill.generateOutput(ctx, HomeAssistant.SelectSource(
+        entityName = "unknown device",
+        sourceName = "BBC Radio 2"
+    ))
+    
+    assertTrue(result is HomeAssistantOutput.EntityNotMapped)
+    assertEquals("unknown device", (result as HomeAssistantOutput.EntityNotMapped).entityName)
+}
+
+@Test
+fun `handleSelectSource - no source list`() = runTest {
+    // Mock API to return state without source_list
+    val result = skill.generateOutput(ctx, HomeAssistant.SelectSource(
+        entityName = "kitchen radio",
+        sourceName = "BBC Radio 2"
+    ))
+    
+    assertTrue(result is HomeAssistantOutput.NoSourceList)
+}
+
+@Test
+fun `handleSelectSource - source not found`() = runTest {
+    // Mock API to return state with source_list that doesn't match
+    val result = skill.generateOutput(ctx, HomeAssistant.SelectSource(
+        entityName = "kitchen radio",
+        sourceName = "Netflix"
+    ))
+    
+    assertTrue(result is HomeAssistantOutput.SourceNotFound)
+    assertEquals("Netflix", (result as HomeAssistantOutput.SourceNotFound).requestedSource)
+}
+
+@Test
+fun `handleSelectSource - API connection failure`() = runTest {
+    // Mock API to throw IOException
+    val result = skill.generateOutput(ctx, HomeAssistant.SelectSource(
+        entityName = "kitchen radio",
+        sourceName = "BBC Radio 2"
+    ))
+    
+    assertTrue(result is HomeAssistantOutput.ConnectionFailed)
+}
+
+@Test
+fun `handleSelectSource - authentication failure`() = runTest {
+    // Mock API to throw 401 error
+    val result = skill.generateOutput(ctx, HomeAssistant.SelectSource(
+        entityName = "kitchen radio",
+        sourceName = "BBC Radio 2"
+    ))
+    
+    assertTrue(result is HomeAssistantOutput.AuthFailed)
+}
+```
+
+#### 4. Similarity Calculation Tests
+
+```kotlin
+@Test
+fun `calculateSimilarity - identical strings`() {
+    val similarity = calculateSimilarity("bbc radio 2", "bbc radio 2")
+    assertEquals(1.0, similarity, 0.01)
+}
+
+@Test
+fun `calculateSimilarity - no common words`() {
+    val similarity = calculateSimilarity("bbc radio 2", "spotify")
+    assertEquals(0.0, similarity, 0.01)
+}
+
+@Test
+fun `calculateSimilarity - partial overlap`() {
+    val similarity = calculateSimilarity("bbc radio 2", "bbc radio 4")
+    assertTrue(similarity > 0.5)
+}
+
+@Test
+fun `calculateSimilarity - subset`() {
+    val similarity = calculateSimilarity("radio 2", "bbc radio 2")
+    assertTrue(similarity > 0.6)
+}
+```
+
+### Integration Tests
+
+#### 1. End-to-End Flow Tests (`HomeAssistantSkillIntegrationTest.kt`)
+
+**Test Class:** `SelectSourceIntegrationTest`
+
+```kotlin
+@Test
+fun `full flow - exact match success`() = runTest {
+    // Mock Home Assistant API responses
+    mockApi.mockGetEntityState("media_player.kitchen_radio", """
+        {
+            "entity_id": "media_player.kitchen_radio",
+            "state": "playing",
+            "attributes": {
+                "source_list": ["BBC Radio 2", "BBC Radio 4", "Spotify"]
+            }
+        }
+    """)
+    
+    mockApi.mockCallService("media_player", "select_source", success = true)
+    
+    val result = skill.generateOutput(ctx, HomeAssistant.SelectSource(
+        entityName = "kitchen radio",
+        sourceName = "BBC Radio 2"
+    ))
+    
+    assertTrue(result is HomeAssistantOutput.SelectSourceSuccess)
+    val success = result as HomeAssistantOutput.SelectSourceSuccess
+    assertEquals("BBC Radio 2", success.sourceName)
+    assertEquals("kitchen radio", success.friendlyName)
+    
+    // Verify API was called with correct parameters
+    mockApi.verifyServiceCalled("media_player", "select_source", mapOf(
+        "entity_id" to "media_player.kitchen_radio",
+        "source" to "BBC Radio 2"
+    ))
+}
+
+@Test
+fun `full flow - fuzzy match success`() = runTest {
+    mockApi.mockGetEntityState("media_player.kitchen_radio", """
+        {
+            "attributes": {
+                "source_list": ["BBC Radio 2", "BBC Radio 4", "Spotify"]
+            }
+        }
+    """)
+    
+    mockApi.mockCallService("media_player", "select_source", success = true)
+    
+    // User says "Radio Two" but source is "BBC Radio 2"
+    val result = skill.generateOutput(ctx, HomeAssistant.SelectSource(
+        entityName = "kitchen radio",
+        sourceName = "Radio Two"
+    ))
+    
+    assertTrue(result is HomeAssistantOutput.SelectSourceSuccess)
+    val success = result as HomeAssistantOutput.SelectSourceSuccess
+    assertEquals("BBC Radio 2", success.sourceName) // Matched to exact source
+    
+    // Verify correct source was sent to API
+    mockApi.verifyServiceCalled("media_player", "select_source", mapOf(
+        "source" to "BBC Radio 2"
+    ))
+}
+
+@Test
+fun `full flow - phonetic match success`() = runTest {
+    mockApi.mockGetEntityState("media_player.kitchen_radio", """
+        {
+            "attributes": {
+                "source_list": ["BBC Radio 2", "BBC Radio 4"]
+            }
+        }
+    """)
+    
+    mockApi.mockCallService("media_player", "select_source", success = true)
+    
+    // User says phonetic spelling
+    val result = skill.generateOutput(ctx, HomeAssistant.SelectSource(
+        entityName = "kitchen radio",
+        sourceName = "bee bee see radio 2"
+    ))
+    
+    assertTrue(result is HomeAssistantOutput.SelectSourceSuccess)
+    assertEquals("BBC Radio 2", (result as HomeAssistantOutput.SelectSourceSuccess).sourceName)
+}
+
+@Test
+fun `full flow - partial match success`() = runTest {
+    mockApi.mockGetEntityState("media_player.kitchen_radio", """
+        {
+            "attributes": {
+                "source_list": ["BBC Radio 2", "BBC Radio 4", "Spotify"]
+            }
+        }
+    """)
+    
+    mockApi.mockCallService("media_player", "select_source", success = true)
+    
+    // User says shortened name
+    val result = skill.generateOutput(ctx, HomeAssistant.SelectSource(
+        entityName = "kitchen radio",
+        sourceName = "radio 2"
+    ))
+    
+    assertTrue(result is HomeAssistantOutput.SelectSourceSuccess)
+    assertEquals("BBC Radio 2", (result as HomeAssistantOutput.SelectSourceSuccess).sourceName)
+}
+
+@Test
+fun `full flow - no match failure`() = runTest {
+    mockApi.mockGetEntityState("media_player.kitchen_radio", """
+        {
+            "attributes": {
+                "source_list": ["BBC Radio 2", "BBC Radio 4", "Spotify"]
+            }
+        }
+    """)
+    
+    val result = skill.generateOutput(ctx, HomeAssistant.SelectSource(
+        entityName = "kitchen radio",
+        sourceName = "Netflix"
+    ))
+    
+    assertTrue(result is HomeAssistantOutput.SourceNotFound)
+    val error = result as HomeAssistantOutput.SourceNotFound
+    assertEquals("Netflix", error.requestedSource)
+    assertEquals("kitchen radio", error.friendlyName)
+    
+    // Verify service was NOT called
+    mockApi.verifyServiceNotCalled("media_player", "select_source")
+}
+
+@Test
+fun `full flow - empty source list`() = runTest {
+    mockApi.mockGetEntityState("media_player.kitchen_radio", """
+        {
+            "attributes": {
+                "source_list": []
+            }
+        }
+    """)
+    
+    val result = skill.generateOutput(ctx, HomeAssistant.SelectSource(
+        entityName = "kitchen radio",
+        sourceName = "BBC Radio 2"
+    ))
+    
+    assertTrue(result is HomeAssistantOutput.NoSourceList)
+}
+
+@Test
+fun `full flow - missing source list attribute`() = runTest {
+    mockApi.mockGetEntityState("media_player.kitchen_radio", """
+        {
+            "attributes": {}
+        }
+    """)
+    
+    val result = skill.generateOutput(ctx, HomeAssistant.SelectSource(
+        entityName = "kitchen radio",
+        sourceName = "BBC Radio 2"
+    ))
+    
+    assertTrue(result is HomeAssistantOutput.NoSourceList)
+}
+```
+
+#### 2. Sentence Recognition Tests
+
+```kotlin
+@Test
+fun `sentence recognition - turn to pattern`() {
+    val input = "turn kitchen radio to BBC Radio 2"
+    val result = recognizer.recognize(input)
+    
+    assertTrue(result is HomeAssistant.SelectSource)
+    val selectSource = result as HomeAssistant.SelectSource
+    assertEquals("kitchen radio", selectSource.entityName)
+    assertEquals("BBC Radio 2", selectSource.sourceName)
+}
+
+@Test
+fun `sentence recognition - set on pattern`() {
+    val input = "set kitchen radio on BBC Radio 2"
+    val result = recognizer.recognize(input)
+    
+    assertTrue(result is HomeAssistant.SelectSource)
+    val selectSource = result as HomeAssistant.SelectSource
+    assertEquals("kitchen radio", selectSource.entityName)
+    assertEquals("BBC Radio 2", selectSource.sourceName)
+}
+
+@Test
+fun `sentence recognition - with the article`() {
+    val input = "turn the kitchen radio to BBC Radio 2"
+    val result = recognizer.recognize(input)
+    
+    assertTrue(result is HomeAssistant.SelectSource)
+    assertEquals("kitchen radio", (result as HomeAssistant.SelectSource).entityName)
+}
+
+@Test
+fun `sentence recognition - does not conflict with set_state_on`() {
+    val input = "turn kitchen radio on"
+    val result = recognizer.recognize(input)
+    
+    // Should match set_state_on, not select_source
+    assertTrue(result is HomeAssistant.SetStateOn)
+}
+```
+
+### Test Coverage Goals
+
+- **Fuzzy matching:** 100% coverage of matching algorithm
+- **Error handling:** All error scenarios covered
+- **API integration:** All API calls mocked and verified
+- **Sentence recognition:** All patterns tested
+- **Edge cases:** Empty strings, special characters, unicode
+
+### Mock Setup
+
+```kotlin
+class MockHomeAssistantApi {
+    private val entityStates = mutableMapOf<String, String>()
+    private val serviceCalls = mutableListOf<ServiceCall>()
+    
+    fun mockGetEntityState(entityId: String, jsonResponse: String) {
+        entityStates[entityId] = jsonResponse
+    }
+    
+    fun mockCallService(domain: String, service: String, success: Boolean) {
+        // Mock implementation
+    }
+    
+    fun verifyServiceCalled(domain: String, service: String, params: Map<String, String>) {
+        val call = serviceCalls.find { 
+            it.domain == domain && it.service == service 
+        }
+        assertNotNull(call)
+        assertEquals(params, call.params)
+    }
+    
+    fun verifyServiceNotCalled(domain: String, service: String) {
+        val call = serviceCalls.find { 
+            it.domain == domain && it.service == service 
+        }
+        assertNull(call)
+    }
+}
+```
+
+## Testing Considerations
+
+### Unit Tests
+
 1. **Fuzzy matching tests**
    - Exact matches
    - Partial matches
@@ -371,6 +879,16 @@ The fuzzy matching uses a three-tier approach:
 2. Test full flow from sentence to output
 3. Test all error scenarios
 4. Test with various entity and source names
+
+### Detailed Test Specifications
+
+See comprehensive test specifications above including:
+- 15+ fuzzy matching test cases covering exact, partial, phonetic, and edge cases
+- Source list extraction tests for all scenarios
+- Error handling tests for all failure modes
+- End-to-end integration tests with mocked API
+- Sentence recognition tests to verify no conflicts with existing patterns
+- Mock setup for API testing
 
 ## Implementation Considerations
 
