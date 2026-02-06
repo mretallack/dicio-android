@@ -54,6 +54,13 @@ class HomeAssistantSkill(
                         ?: return HomeAssistantOutput.EntityNotMapped(entityName)
                     handleSetState(settings, mapping, "toggle")
                 }
+                is HomeAssistant.SelectSource -> {
+                    val entityName = inputData.entityName ?: ""
+                    val sourceName = inputData.sourceName ?: ""
+                    val mapping = findBestMatch(entityName, settings.entityMappingsList)
+                        ?: return HomeAssistantOutput.EntityNotMapped(entityName)
+                    handleSelectSource(settings, mapping, sourceName)
+                }
             }
         } catch (e: FileNotFoundException) {
             HomeAssistantOutput.EntityNotFound("unknown")
@@ -130,6 +137,88 @@ class HomeAssistantSkill(
             friendlyName = mapping.friendlyName,
             action = parsedAction.spokenForm
         )
+    }
+
+    private suspend fun handleSelectSource(
+        settings: SkillSettingsHomeAssistant,
+        mapping: EntityMapping,
+        requestedSource: String
+    ): SkillOutput {
+        // Get entity state to retrieve source_list
+        val state = HomeAssistantApi.getEntityState(
+            settings.baseUrl,
+            settings.accessToken,
+            mapping.entityId
+        )
+        
+        // Extract source_list attribute
+        val attributes = state.optJSONObject("attributes")
+        val sourceListJson = attributes?.optJSONArray("source_list")
+        
+        if (sourceListJson == null || sourceListJson.length() == 0) {
+            return HomeAssistantOutput.NoSourceList(mapping.friendlyName)
+        }
+        
+        // Convert to list
+        val sourceList = (0 until sourceListJson.length())
+            .map { sourceListJson.getString(it) }
+        
+        // Fuzzy match requested source
+        val matchedSource = findBestSourceMatch(requestedSource, sourceList)
+            ?: return HomeAssistantOutput.SourceNotFound(
+                requestedSource,
+                mapping.friendlyName
+            )
+        
+        // Call select_source service
+        HomeAssistantApi.callService(
+            settings.baseUrl,
+            settings.accessToken,
+            "media_player",
+            "select_source",
+            mapping.entityId,
+            mapOf("source" to matchedSource)
+        )
+        
+        return HomeAssistantOutput.SelectSourceSuccess(
+            entityId = mapping.entityId,
+            friendlyName = mapping.friendlyName,
+            sourceName = matchedSource
+        )
+    }
+
+    private fun findBestSourceMatch(requested: String, available: List<String>): String? {
+        val normalized = requested.lowercase().trim()
+        
+        // 1. Exact match (case insensitive)
+        available.firstOrNull { it.lowercase() == normalized }?.let { return it }
+        
+        // 2. Contains match (either direction)
+        available.firstOrNull {
+            it.lowercase().contains(normalized) ||
+            normalized.contains(it.lowercase())
+        }?.let { return it }
+        
+        // 3. Word-based similarity with tie-breaking
+        val scored = available.mapIndexed { index, source ->
+            Triple(source, calculateSimilarity(normalized, source.lowercase()), index)
+        }.filter { it.second >= 0.5 }
+        
+        // When multiple sources have same score:
+        // 1. Prefer higher similarity
+        // 2. Then prefer shorter match
+        // 3. Then prefer earlier in list (original order)
+        return scored.maxWithOrNull(
+            compareBy({ it.second }, { -it.first.length }, { -it.third })
+        )?.first
+    }
+
+    private fun calculateSimilarity(s1: String, s2: String): Double {
+        val words1 = s1.split(Regex("\\s+")).toSet()
+        val words2 = s2.split(Regex("\\s+")).toSet()
+        val intersection = words1.intersect(words2).size
+        val union = words1.union(words2).size
+        return if (union > 0) intersection.toDouble() / union else 0.0
     }
 
     private fun findBestMatch(spokenName: String, mappings: List<EntityMapping>): EntityMapping? {
