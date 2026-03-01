@@ -250,9 +250,8 @@ The Home Assistant skill:
 If you encounter issues:
 
 1. Check the [Home Assistant REST API documentation](https://developers.home-assistant.io/docs/api/rest/)
-2. Verify your setup works with curl commands (see `.amazonq/rules/homeassistant.md`)
-3. Open an issue on [GitHub](https://github.com/Stypox/dicio-android/issues)
-4. Join the [Matrix room](https://matrix.to/#/#dicio:matrix.org) for community support
+2. Open an issue on [GitHub](https://github.com/Stypox/dicio-android/issues)
+3. Join the [Matrix room](https://matrix.to/#/#dicio:matrix.org) for community support
 
 ---
 
