@@ -3,13 +3,13 @@ package org.stypox.dicio.skills.homeassistant
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
-import org.stypox.dicio.MockSkillContext
 import org.stypox.dicio.sentences.Sentences
 
 class HomeAssistantSkillTest : StringSpec({
     "parse 'turn outside lights off'" {
         val data = Sentences.HomeAssistant["en"]!!
-        val (score, inputData) = data.score(MockSkillContext, "turn outside lights off")
+        val input = "turn outside lights off"
+        val (score, inputData) = data.score(TestSkillContext(input), input)
         
         inputData.shouldBeInstanceOf<Sentences.HomeAssistant.SetStateOff>()
         val setState = inputData as Sentences.HomeAssistant.SetStateOff
@@ -18,7 +18,8 @@ class HomeAssistantSkillTest : StringSpec({
 
     "parse 'turn the kitchen light on'" {
         val data = Sentences.HomeAssistant["en"]!!
-        val (score, inputData) = data.score(MockSkillContext, "turn the kitchen light on")
+        val input = "turn the kitchen light on"
+        val (score, inputData) = data.score(TestSkillContext(input), input)
         
         inputData.shouldBeInstanceOf<Sentences.HomeAssistant.SetStateOn>()
         val setState = inputData as Sentences.HomeAssistant.SetStateOn
@@ -27,7 +28,8 @@ class HomeAssistantSkillTest : StringSpec({
 
     "parse 'switch bedroom lamp off'" {
         val data = Sentences.HomeAssistant["en"]!!
-        val (score, inputData) = data.score(MockSkillContext, "switch bedroom lamp off")
+        val input = "switch bedroom lamp off"
+        val (score, inputData) = data.score(TestSkillContext(input), input)
         
         inputData.shouldBeInstanceOf<Sentences.HomeAssistant.SetStateOff>()
         val setState = inputData as Sentences.HomeAssistant.SetStateOff
@@ -36,7 +38,8 @@ class HomeAssistantSkillTest : StringSpec({
 
     "parse 'get status of living room light'" {
         val data = Sentences.HomeAssistant["en"]!!
-        val (score, inputData) = data.score(MockSkillContext, "get status of living room light")
+        val input = "get status of living room light"
+        val (score, inputData) = data.score(TestSkillContext(input), input)
         
         inputData.shouldBeInstanceOf<Sentences.HomeAssistant.GetStatus>()
         val getStatus = inputData as Sentences.HomeAssistant.GetStatus
@@ -45,7 +48,8 @@ class HomeAssistantSkillTest : StringSpec({
 
     "parse 'what is the status for garage door'" {
         val data = Sentences.HomeAssistant["en"]!!
-        val (score, inputData) = data.score(MockSkillContext, "what is the status for garage door")
+        val input = "what is the status for garage door"
+        val (score, inputData) = data.score(TestSkillContext(input), input)
         
         inputData.shouldBeInstanceOf<Sentences.HomeAssistant.GetStatus>()
         val getStatus = inputData as Sentences.HomeAssistant.GetStatus
@@ -54,7 +58,8 @@ class HomeAssistantSkillTest : StringSpec({
 
     "parse 'check downstairs hallway lights'" {
         val data = Sentences.HomeAssistant["en"]!!
-        val (score, inputData) = data.score(MockSkillContext, "check downstairs hallway lights")
+        val input = "check downstairs hallway lights"
+        val (score, inputData) = data.score(TestSkillContext(input), input)
         
         inputData.shouldBeInstanceOf<Sentences.HomeAssistant.GetStatus>()
         val getStatus = inputData as Sentences.HomeAssistant.GetStatus
@@ -63,7 +68,8 @@ class HomeAssistantSkillTest : StringSpec({
 
     "parse 'check the downstairs hallway lights'" {
         val data = Sentences.HomeAssistant["en"]!!
-        val (score, inputData) = data.score(MockSkillContext, "check the downstairs hallway lights")
+        val input = "check the downstairs hallway lights"
+        val (score, inputData) = data.score(TestSkillContext(input), input)
         
         inputData.shouldBeInstanceOf<Sentences.HomeAssistant.GetStatus>()
         val getStatus = inputData as Sentences.HomeAssistant.GetStatus
@@ -72,7 +78,8 @@ class HomeAssistantSkillTest : StringSpec({
 
     "parse 'whats the status of bedroom light'" {
         val data = Sentences.HomeAssistant["en"]!!
-        val (score, inputData) = data.score(MockSkillContext, "whats the status of bedroom light")
+        val input = "whats the status of bedroom light"
+        val (score, inputData) = data.score(TestSkillContext(input), input)
         
         inputData.shouldBeInstanceOf<Sentences.HomeAssistant.GetStatus>()
         val getStatus = inputData as Sentences.HomeAssistant.GetStatus
@@ -81,7 +88,8 @@ class HomeAssistantSkillTest : StringSpec({
 
     "parse 'get front door'" {
         val data = Sentences.HomeAssistant["en"]!!
-        val (score, inputData) = data.score(MockSkillContext, "get front door")
+        val input = "get front door"
+        val (score, inputData) = data.score(TestSkillContext(input), input)
         
         inputData.shouldBeInstanceOf<Sentences.HomeAssistant.GetStatus>()
         val getStatus = inputData as Sentences.HomeAssistant.GetStatus
@@ -90,7 +98,8 @@ class HomeAssistantSkillTest : StringSpec({
 
     "parse 'what is porch light'" {
         val data = Sentences.HomeAssistant["en"]!!
-        val (score, inputData) = data.score(MockSkillContext, "what is porch light")
+        val input = "what is porch light"
+        val (score, inputData) = data.score(TestSkillContext(input), input)
         
         inputData.shouldBeInstanceOf<Sentences.HomeAssistant.GetStatus>()
         val getStatus = inputData as Sentences.HomeAssistant.GetStatus
@@ -99,7 +108,8 @@ class HomeAssistantSkillTest : StringSpec({
 
     "parse 'switch the living room light on'" {
         val data = Sentences.HomeAssistant["en"]!!
-        val (score, inputData) = data.score(MockSkillContext, "switch the living room light on")
+        val input = "switch the living room light on"
+        val (score, inputData) = data.score(TestSkillContext(input), input)
         
         inputData.shouldBeInstanceOf<Sentences.HomeAssistant.SetStateOn>()
         val setState = inputData as Sentences.HomeAssistant.SetStateOn
@@ -108,7 +118,8 @@ class HomeAssistantSkillTest : StringSpec({
 
     "parse 'turn garage door off'" {
         val data = Sentences.HomeAssistant["en"]!!
-        val (score, inputData) = data.score(MockSkillContext, "turn garage door off")
+        val input = "turn garage door off"
+        val (score, inputData) = data.score(TestSkillContext(input), input)
         
         inputData.shouldBeInstanceOf<Sentences.HomeAssistant.SetStateOff>()
         val setState = inputData as Sentences.HomeAssistant.SetStateOff
@@ -117,7 +128,8 @@ class HomeAssistantSkillTest : StringSpec({
 
     "parse 'switch the fan off'" {
         val data = Sentences.HomeAssistant["en"]!!
-        val (score, inputData) = data.score(MockSkillContext, "switch the fan off")
+        val input = "switch the fan off"
+        val (score, inputData) = data.score(TestSkillContext(input), input)
         
         inputData.shouldBeInstanceOf<Sentences.HomeAssistant.SetStateOff>()
         val setState = inputData as Sentences.HomeAssistant.SetStateOff
@@ -126,7 +138,8 @@ class HomeAssistantSkillTest : StringSpec({
 
     "parse 'turn office light toggle'" {
         val data = Sentences.HomeAssistant["en"]!!
-        val (score, inputData) = data.score(MockSkillContext, "turn office light toggle")
+        val input = "turn office light toggle"
+        val (score, inputData) = data.score(TestSkillContext(input), input)
         
         inputData.shouldBeInstanceOf<Sentences.HomeAssistant.SetStateToggle>()
         val setState = inputData as Sentences.HomeAssistant.SetStateToggle
@@ -135,7 +148,8 @@ class HomeAssistantSkillTest : StringSpec({
 
     "parse 'switch the basement lights toggle'" {
         val data = Sentences.HomeAssistant["en"]!!
-        val (score, inputData) = data.score(MockSkillContext, "switch the basement lights toggle")
+        val input = "switch the basement lights toggle"
+        val (score, inputData) = data.score(TestSkillContext(input), input)
         
         inputData.shouldBeInstanceOf<Sentences.HomeAssistant.SetStateToggle>()
         val setState = inputData as Sentences.HomeAssistant.SetStateToggle
@@ -144,7 +158,8 @@ class HomeAssistantSkillTest : StringSpec({
 
     "parse 'where is the person Mark'" {
         val data = Sentences.HomeAssistant["en"]!!
-        val (score, inputData) = data.score(MockSkillContext, "where is the person Mark")
+        val input = "where is the person Mark"
+        val (score, inputData) = data.score(TestSkillContext(input), input)
         
         inputData.shouldBeInstanceOf<Sentences.HomeAssistant.GetPersonLocation>()
         val getLocation = inputData as Sentences.HomeAssistant.GetPersonLocation
@@ -153,7 +168,8 @@ class HomeAssistantSkillTest : StringSpec({
 
     "parse 'wheres the person Sarah'" {
         val data = Sentences.HomeAssistant["en"]!!
-        val (score, inputData) = data.score(MockSkillContext, "wheres the person Sarah")
+        val input = "wheres the person Sarah"
+        val (score, inputData) = data.score(TestSkillContext(input), input)
         
         inputData.shouldBeInstanceOf<Sentences.HomeAssistant.GetPersonLocation>()
         val getLocation = inputData as Sentences.HomeAssistant.GetPersonLocation
@@ -162,7 +178,8 @@ class HomeAssistantSkillTest : StringSpec({
 
     "parse 'whats John location'" {
         val data = Sentences.HomeAssistant["en"]!!
-        val (score, inputData) = data.score(MockSkillContext, "whats John location")
+        val input = "whats John location"
+        val (score, inputData) = data.score(TestSkillContext(input), input)
         
         inputData.shouldBeInstanceOf<Sentences.HomeAssistant.GetPersonLocation>()
         val getLocation = inputData as Sentences.HomeAssistant.GetPersonLocation
@@ -171,7 +188,8 @@ class HomeAssistantSkillTest : StringSpec({
 
     "parse 'what is Emily location'" {
         val data = Sentences.HomeAssistant["en"]!!
-        val (score, inputData) = data.score(MockSkillContext, "what is Emily location")
+        val input = "what is Emily location"
+        val (score, inputData) = data.score(TestSkillContext(input), input)
         
         inputData.shouldBeInstanceOf<Sentences.HomeAssistant.GetPersonLocation>()
         val getLocation = inputData as Sentences.HomeAssistant.GetPersonLocation
@@ -181,7 +199,8 @@ class HomeAssistantSkillTest : StringSpec({
     // Select Source sentence recognition tests
     "parse 'turn kitchen radio to BBC Radio 2'" {
         val data = Sentences.HomeAssistant["en"]!!
-        val (score, inputData) = data.score(MockSkillContext, "turn kitchen radio to BBC Radio 2")
+        val input = "turn kitchen radio to BBC Radio 2"
+        val (score, inputData) = data.score(TestSkillContext(input), input)
         
         inputData.shouldBeInstanceOf<Sentences.HomeAssistant.SelectSource>()
         val selectSource = inputData as Sentences.HomeAssistant.SelectSource
@@ -191,7 +210,8 @@ class HomeAssistantSkillTest : StringSpec({
 
     "parse 'set kitchen radio on Virgin Radio'" {
         val data = Sentences.HomeAssistant["en"]!!
-        val (score, inputData) = data.score(MockSkillContext, "set kitchen radio on Virgin Radio")
+        val input = "set kitchen radio on Virgin Radio"
+        val (score, inputData) = data.score(TestSkillContext(input), input)
         
         inputData.shouldBeInstanceOf<Sentences.HomeAssistant.SelectSource>()
         val selectSource = inputData as Sentences.HomeAssistant.SelectSource
@@ -201,7 +221,8 @@ class HomeAssistantSkillTest : StringSpec({
 
     "parse 'tune the bedroom speaker to Heart Dorset'" {
         val data = Sentences.HomeAssistant["en"]!!
-        val (score, inputData) = data.score(MockSkillContext, "tune the bedroom speaker to Heart Dorset")
+        val input = "tune the bedroom speaker to Heart Dorset"
+        val (score, inputData) = data.score(TestSkillContext(input), input)
         
         inputData.shouldBeInstanceOf<Sentences.HomeAssistant.SelectSource>()
         val selectSource = inputData as Sentences.HomeAssistant.SelectSource
@@ -211,7 +232,8 @@ class HomeAssistantSkillTest : StringSpec({
 
     "parse 'change living room tv to HDMI 1'" {
         val data = Sentences.HomeAssistant["en"]!!
-        val (score, inputData) = data.score(MockSkillContext, "change living room tv to HDMI 1")
+        val input = "change living room tv to HDMI 1"
+        val (score, inputData) = data.score(TestSkillContext(input), input)
         
         inputData.shouldBeInstanceOf<Sentences.HomeAssistant.SelectSource>()
         val selectSource = inputData as Sentences.HomeAssistant.SelectSource
@@ -221,7 +243,8 @@ class HomeAssistantSkillTest : StringSpec({
 
     "does not conflict with set_state_on" {
         val data = Sentences.HomeAssistant["en"]!!
-        val (score, inputData) = data.score(MockSkillContext, "turn kitchen radio on")
+        val input = "turn kitchen radio on"
+        val (score, inputData) = data.score(TestSkillContext(input), input)
         
         inputData.shouldBeInstanceOf<Sentences.HomeAssistant.SetStateOn>()
         val setState = inputData as Sentences.HomeAssistant.SetStateOn
