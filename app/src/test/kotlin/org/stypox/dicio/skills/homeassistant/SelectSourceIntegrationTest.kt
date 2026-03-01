@@ -3,6 +3,7 @@ package org.stypox.dicio.skills.homeassistant
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
+import org.stypox.dicio.MockSkillContext
 import org.stypox.dicio.sentences.Sentences
 
 /**
@@ -13,7 +14,7 @@ class SelectSourceIntegrationTest : StringSpec({
 
     "sentence recognition - turn to pattern" {
         val data = Sentences.HomeAssistant["en"]!!
-        val (score, inputData) = data.score("turn kitchen radio to BBC Radio 2")
+        val (score, inputData) = data.score(MockSkillContext, "turn kitchen radio to BBC Radio 2")
         
         inputData.shouldBeInstanceOf<Sentences.HomeAssistant.SelectSource>()
         val selectSource = inputData as Sentences.HomeAssistant.SelectSource
@@ -23,7 +24,7 @@ class SelectSourceIntegrationTest : StringSpec({
 
     "sentence recognition - set on pattern" {
         val data = Sentences.HomeAssistant["en"]!!
-        val (score, inputData) = data.score("set kitchen radio on Virgin Radio")
+        val (score, inputData) = data.score(MockSkillContext, "set kitchen radio on Virgin Radio")
         
         inputData.shouldBeInstanceOf<Sentences.HomeAssistant.SelectSource>()
         val selectSource = inputData as Sentences.HomeAssistant.SelectSource
@@ -33,7 +34,7 @@ class SelectSourceIntegrationTest : StringSpec({
 
     "sentence recognition - tune to pattern" {
         val data = Sentences.HomeAssistant["en"]!!
-        val (score, inputData) = data.score("tune bedroom speaker to Heart Dorset")
+        val (score, inputData) = data.score(MockSkillContext, "tune bedroom speaker to Heart Dorset")
         
         inputData.shouldBeInstanceOf<Sentences.HomeAssistant.SelectSource>()
         val selectSource = inputData as Sentences.HomeAssistant.SelectSource
@@ -43,7 +44,7 @@ class SelectSourceIntegrationTest : StringSpec({
 
     "sentence recognition - change to pattern" {
         val data = Sentences.HomeAssistant["en"]!!
-        val (score, inputData) = data.score("change living room tv to HDMI 1")
+        val (score, inputData) = data.score(MockSkillContext, "change living room tv to HDMI 1")
         
         inputData.shouldBeInstanceOf<Sentences.HomeAssistant.SelectSource>()
         val selectSource = inputData as Sentences.HomeAssistant.SelectSource
@@ -53,7 +54,7 @@ class SelectSourceIntegrationTest : StringSpec({
 
     "sentence recognition - switch to pattern" {
         val data = Sentences.HomeAssistant["en"]!!
-        val (score, inputData) = data.score("switch office stereo to Spotify")
+        val (score, inputData) = data.score(MockSkillContext, "switch office stereo to Spotify")
         
         inputData.shouldBeInstanceOf<Sentences.HomeAssistant.SelectSource>()
         val selectSource = inputData as Sentences.HomeAssistant.SelectSource
@@ -63,7 +64,7 @@ class SelectSourceIntegrationTest : StringSpec({
 
     "sentence recognition - with the article" {
         val data = Sentences.HomeAssistant["en"]!!
-        val (score, inputData) = data.score("turn the kitchen radio to BBC Radio 2")
+        val (score, inputData) = data.score(MockSkillContext, "turn the kitchen radio to BBC Radio 2")
         
         inputData.shouldBeInstanceOf<Sentences.HomeAssistant.SelectSource>()
         val selectSource = inputData as Sentences.HomeAssistant.SelectSource
@@ -73,7 +74,7 @@ class SelectSourceIntegrationTest : StringSpec({
 
     "sentence recognition - tune on pattern" {
         val data = Sentences.HomeAssistant["en"]!!
-        val (score, inputData) = data.score("tune kitchen radio on BBC Radio 4")
+        val (score, inputData) = data.score(MockSkillContext, "tune kitchen radio on BBC Radio 4")
         
         inputData.shouldBeInstanceOf<Sentences.HomeAssistant.SelectSource>()
         val selectSource = inputData as Sentences.HomeAssistant.SelectSource
@@ -83,7 +84,7 @@ class SelectSourceIntegrationTest : StringSpec({
 
     "sentence recognition - set on pattern with the" {
         val data = Sentences.HomeAssistant["en"]!!
-        val (score, inputData) = data.score("set the bedroom speaker on Virgin Radio")
+        val (score, inputData) = data.score(MockSkillContext, "set the bedroom speaker on Virgin Radio")
         
         inputData.shouldBeInstanceOf<Sentences.HomeAssistant.SelectSource>()
         val selectSource = inputData as Sentences.HomeAssistant.SelectSource
@@ -93,7 +94,7 @@ class SelectSourceIntegrationTest : StringSpec({
 
     "sentence recognition - multi-word entity and source" {
         val data = Sentences.HomeAssistant["en"]!!
-        val (score, inputData) = data.score("turn living room smart speaker to Greatest Hits Radio Dorset")
+        val (score, inputData) = data.score(MockSkillContext, "turn living room smart speaker to Greatest Hits Radio Dorset")
         
         inputData.shouldBeInstanceOf<Sentences.HomeAssistant.SelectSource>()
         val selectSource = inputData as Sentences.HomeAssistant.SelectSource
@@ -103,7 +104,7 @@ class SelectSourceIntegrationTest : StringSpec({
 
     "sentence recognition - source with special characters" {
         val data = Sentences.HomeAssistant["en"]!!
-        val (score, inputData) = data.score("turn kitchen radio to Magic 100% Christmas")
+        val (score, inputData) = data.score(MockSkillContext, "turn kitchen radio to Magic 100% Christmas")
         
         inputData.shouldBeInstanceOf<Sentences.HomeAssistant.SelectSource>()
         val selectSource = inputData as Sentences.HomeAssistant.SelectSource
@@ -113,7 +114,7 @@ class SelectSourceIntegrationTest : StringSpec({
 
     "sentence recognition - homophone 'too' instead of '2'" {
         val data = Sentences.HomeAssistant["en"]!!
-        val (score, inputData) = data.score("turn kitchen radio to BBC Radio too")
+        val (score, inputData) = data.score(MockSkillContext, "turn kitchen radio to BBC Radio too")
         
         inputData.shouldBeInstanceOf<Sentences.HomeAssistant.SelectSource>()
         val selectSource = inputData as Sentences.HomeAssistant.SelectSource
@@ -123,7 +124,7 @@ class SelectSourceIntegrationTest : StringSpec({
 
     "sentence recognition - homophone 'for' instead of '4'" {
         val data = Sentences.HomeAssistant["en"]!!
-        val (score, inputData) = data.score("turn kitchen radio to BBC Radio for")
+        val (score, inputData) = data.score(MockSkillContext, "turn kitchen radio to BBC Radio for")
         
         inputData.shouldBeInstanceOf<Sentences.HomeAssistant.SelectSource>()
         val selectSource = inputData as Sentences.HomeAssistant.SelectSource
@@ -133,7 +134,7 @@ class SelectSourceIntegrationTest : StringSpec({
 
     "sentence recognition - does not conflict with set_state_on" {
         val data = Sentences.HomeAssistant["en"]!!
-        val (score, inputData) = data.score("turn kitchen radio on")
+        val (score, inputData) = data.score(MockSkillContext, "turn kitchen radio on")
         
         // Should match set_state_on, not select_source
         inputData.shouldBeInstanceOf<Sentences.HomeAssistant.SetStateOn>()
@@ -143,7 +144,7 @@ class SelectSourceIntegrationTest : StringSpec({
 
     "sentence recognition - does not conflict with set_state_off" {
         val data = Sentences.HomeAssistant["en"]!!
-        val (score, inputData) = data.score("turn kitchen radio off")
+        val (score, inputData) = data.score(MockSkillContext, "turn kitchen radio off")
         
         // Should match set_state_off, not select_source
         inputData.shouldBeInstanceOf<Sentences.HomeAssistant.SetStateOff>()
