@@ -271,8 +271,6 @@
     <string name="pref_homeassistant_add_mapping">Add Mapping</string>
     <string name="pref_homeassistant_friendly_name">Friendly Name</string>
     <string name="pref_homeassistant_entity_id">Entity ID</string>
-    <string name="pref_homeassistant_export_yaml">Export YAML</string>
-    <string name="pref_homeassistant_import_yaml">Import YAML</string>
     <string name="skill_notify_message_no_app">The notification says %1$s.</string>
     <string name="skill_notify_message_app">The %1$s notification says %2$s.</string>
     <string name="skill_notify_messages_separator">, </string>

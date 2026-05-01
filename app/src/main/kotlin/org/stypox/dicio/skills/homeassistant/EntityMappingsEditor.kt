@@ -1,7 +1,5 @@
 package org.stypox.dicio.skills.homeassistant
 
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -13,8 +11,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.FileDownload
-import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -42,7 +38,7 @@ import org.stypox.dicio.R
 
 /**
  * Editor UI for managing Home Assistant entity mappings (friendly name <-> entity ID).
- * Supports adding, editing, deleting mappings, and importing/exporting via YAML files.
+ * Supports adding, editing, and deleting mappings.
  */
 @Composable
 fun EntityMappingsEditor(
@@ -50,40 +46,9 @@ fun EntityMappingsEditor(
     baseUrl: String,
     accessToken: String,
     onMappingsChange: (List<EntityMapping>) -> Unit,
-    onImport: (HomeAssistantYamlUtils.YamlHomeAssistantConfig) -> Unit
 ) {
     var showDialog by remember { mutableStateOf(false) }
     var editIndex by remember { mutableStateOf(-1) }
-    val context = LocalContext.current
-
-    val exportLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("application/json")
-    ) { uri ->
-        uri?.let {
-            try {
-                context.contentResolver.openOutputStream(it)?.use { outputStream ->
-                    HomeAssistantYamlUtils.exportToYaml(baseUrl, accessToken, mappings, outputStream)
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-    }
-
-    val importLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        uri?.let {
-            try {
-                context.contentResolver.openInputStream(it)?.use { inputStream ->
-                    val config = HomeAssistantYamlUtils.importFromYaml(inputStream)
-                    onImport(config)
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-    }
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -95,23 +60,11 @@ fun EntityMappingsEditor(
                 text = stringResource(R.string.pref_homeassistant_entity_mappings),
                 style = MaterialTheme.typography.titleMedium
             )
-            Row {
-                IconButton(onClick = {
-                    importLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
-                }) {
-                    Icon(Icons.Default.FileUpload, contentDescription = "Import YAML")
-                }
-                IconButton(onClick = {
-                    exportLauncher.launch("home_assistant_config.json")
-                }) {
-                    Icon(Icons.Default.FileDownload, contentDescription = "Export YAML")
-                }
-                IconButton(onClick = {
-                    editIndex = -1
-                    showDialog = true
-                }) {
-                    Icon(Icons.Default.Add, contentDescription = stringResource(R.string.pref_homeassistant_add_mapping))
-                }
+            IconButton(onClick = {
+                editIndex = -1
+                showDialog = true
+            }) {
+                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.pref_homeassistant_add_mapping))
             }
         }
 

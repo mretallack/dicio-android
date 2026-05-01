@@ -111,25 +111,6 @@ object HomeAssistantInfo : SkillInfo("home_assistant") {
                         }
                     }
                 },
-                onImport = { config ->
-                    scope.launch {
-                        dataStore.updateData { currentData ->
-                            val newMappings = config.entityMappings.map { yamlMapping ->
-                                EntityMapping.newBuilder()
-                                    .setFriendlyName(yamlMapping.friendlyName)
-                                    .setEntityId(yamlMapping.entityId)
-                                    .build()
-                            }
-
-                            currentData.toBuilder()
-                                .setBaseUrl(config.baseUrl)
-                                .setAccessToken(config.accessToken)
-                                .clearEntityMappings()
-                                .addAllEntityMappings(newMappings)
-                                .build()
-                        }
-                    }
-                }
             )
         }
     }
