@@ -1,23 +1,35 @@
 package org.stypox.dicio.skills.homeassistant
 
-import org.yaml.snakeyaml.DumperOptions
-import org.yaml.snakeyaml.Yaml
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import java.io.InputStream
 import java.io.OutputStream
 
+/**
+ * Handles import/export of Home Assistant configuration (entity mappings, URL, token)
+ * using Kotlin serialization with JSON format.
+ */
 object HomeAssistantYamlUtils {
-    
+
+    private val json = Json {
+        prettyPrint = true
+        ignoreUnknownKeys = true
+    }
+
+    @Serializable
     data class YamlEntityMapping(
-        val friendlyName: String,
-        val entityId: String
+        @SerialName("friendly_name") val friendlyName: String,
+        @SerialName("entity_id") val entityId: String
     )
-    
+
+    @Serializable
     data class YamlHomeAssistantConfig(
-        val baseUrl: String = "",
-        val accessToken: String = "",
-        val entityMappings: List<YamlEntityMapping> = emptyList()
+        @SerialName("base_url") val baseUrl: String = "",
+        @SerialName("access_token") val accessToken: String = "",
+        @SerialName("entity_mappings") val entityMappings: List<YamlEntityMapping> = emptyList()
     )
-    
+
     fun exportToYaml(
         baseUrl: String,
         accessToken: String,
@@ -27,39 +39,15 @@ object HomeAssistantYamlUtils {
         val config = YamlHomeAssistantConfig(
             baseUrl = baseUrl,
             accessToken = accessToken,
-            entityMappings = mappings.map { 
-                YamlEntityMapping(it.friendlyName, it.entityId) 
+            entityMappings = mappings.map {
+                YamlEntityMapping(it.friendlyName, it.entityId)
             }
         )
-        
-        val options = DumperOptions().apply {
-            defaultFlowStyle = DumperOptions.FlowStyle.BLOCK
-            isPrettyFlow = true
-        }
-        
-        val yaml = Yaml(options)
-        outputStream.writer().use { writer ->
-            yaml.dump(mapOf("homeAssistant" to config), writer)
-        }
+        outputStream.writer().use { it.write(json.encodeToString(config)) }
     }
-    
+
     fun importFromYaml(inputStream: InputStream): YamlHomeAssistantConfig {
-        val yaml = Yaml()
-        val data = yaml.load<Map<String, Any>>(inputStream)
-        val haConfig = data["homeAssistant"] as? Map<String, Any> ?: return YamlHomeAssistantConfig()
-        
-        val baseUrl = haConfig["baseUrl"] as? String ?: ""
-        val accessToken = haConfig["accessToken"] as? String ?: ""
-        val mappingsData = haConfig["entityMappings"] as? List<Map<String, Any>> ?: emptyList()
-        
-        val mappings = mappingsData.mapNotNull { mapping ->
-            val friendlyName = mapping["friendlyName"] as? String
-            val entityId = mapping["entityId"] as? String
-            if (friendlyName != null && entityId != null) {
-                YamlEntityMapping(friendlyName, entityId)
-            } else null
-        }
-        
-        return YamlHomeAssistantConfig(baseUrl, accessToken, mappings)
+        val text = inputStream.reader().use { it.readText() }
+        return json.decodeFromString(text)
     }
 }

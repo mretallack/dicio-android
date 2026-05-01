@@ -1,6 +1,7 @@
 package org.stypox.dicio.skills.homeassistant
 
 import kotlinx.coroutines.flow.first
+import org.dicio.numbers.unit.Number
 import org.dicio.skill.context.SkillContext
 import org.dicio.skill.skill.SkillInfo
 import org.dicio.skill.skill.SkillOutput
@@ -8,6 +9,7 @@ import org.dicio.skill.standard.StandardRecognizerData
 import org.dicio.skill.standard.StandardRecognizerSkill
 import org.stypox.dicio.sentences.Sentences.HomeAssistant
 import org.stypox.dicio.skills.homeassistant.HomeAssistantInfo.homeAssistantDataStore
+import org.stypox.dicio.util.StringUtils
 import java.io.FileNotFoundException
 
 class HomeAssistantSkill(
@@ -16,7 +18,6 @@ class HomeAssistantSkill(
 ) : StandardRecognizerSkill<HomeAssistant>(correspondingSkillInfo, data) {
 
     override suspend fun generateOutput(ctx: SkillContext, inputData: HomeAssistant): SkillOutput {
-        android.util.Log.d("HomeAssistantSkill", "generateOutput called with inputData: $inputData")
         val settings = ctx.android.homeAssistantDataStore.data.first()
         
         return try {
@@ -40,35 +41,48 @@ class HomeAssistantSkill(
                     val entityName = inputData.entityName ?: ""
                     val mapping = findBestMatch(entityName, settings.entityMappingsList)
                         ?: return HomeAssistantOutput.EntityNotMapped(entityName)
-                    handleSetState(settings, mapping, "on")
+                    // Parse the action at the call site, so handleSetState receives
+                    // a validated ParsedAction rather than a raw string.
+                    val domain = mapping.entityId.substringBefore(".")
+                    val action = parseAction("on", domain)
+                        ?: return HomeAssistantOutput.InvalidAction("on", domain)
+                    handleSetState(settings, mapping, action)
                 }
                 is HomeAssistant.SetStateOff -> {
                     val entityName = inputData.entityName ?: ""
                     val mapping = findBestMatch(entityName, settings.entityMappingsList)
                         ?: return HomeAssistantOutput.EntityNotMapped(entityName)
-                    handleSetState(settings, mapping, "off")
+                    val domain = mapping.entityId.substringBefore(".")
+                    val action = parseAction("off", domain)
+                        ?: return HomeAssistantOutput.InvalidAction("off", domain)
+                    handleSetState(settings, mapping, action)
                 }
                 is HomeAssistant.SetStateToggle -> {
                     val entityName = inputData.entityName ?: ""
                     val mapping = findBestMatch(entityName, settings.entityMappingsList)
                         ?: return HomeAssistantOutput.EntityNotMapped(entityName)
-                    handleSetState(settings, mapping, "toggle")
+                    val domain = mapping.entityId.substringBefore(".")
+                    val action = parseAction("toggle", domain)
+                        ?: return HomeAssistantOutput.InvalidAction("toggle", domain)
+                    handleSetState(settings, mapping, action)
                 }
                 is HomeAssistant.SelectSource -> {
                     val entityName = inputData.entityName ?: ""
                     val sourceName = inputData.sourceName ?: ""
                     val mapping = findBestMatch(entityName, settings.entityMappingsList)
                         ?: return HomeAssistantOutput.EntityNotMapped(entityName)
-                    handleSelectSource(settings, mapping, sourceName)
+                    handleSelectSource(ctx, settings, mapping, sourceName)
                 }
             }
+        // Only catch exceptions we can meaningfully handle; let unrecognized
+        // exceptions propagate so Dicio's infrastructure shows the error to the user.
         } catch (e: FileNotFoundException) {
             HomeAssistantOutput.EntityNotFound("unknown")
         } catch (e: Exception) {
             if (e.message?.contains("401") == true || e.message?.contains("403") == true) {
                 HomeAssistantOutput.AuthFailed()
             } else {
-                HomeAssistantOutput.ConnectionFailed()
+                throw e
             }
         }
     }
@@ -95,21 +109,20 @@ class HomeAssistantSkill(
         )
     }
 
+    /**
+     * Handles state changes (on/off/toggle) for an entity.
+     * Accepts a pre-validated [ParsedAction] so that action parsing happens at the call site,
+     * keeping this method focused on the HA API call and domain-specific service mapping.
+     */
     private suspend fun handleSetState(
         settings: SkillSettingsHomeAssistant,
         mapping: EntityMapping,
-        action: String
+        parsedAction: ParsedAction
     ): SkillOutput {
-        android.util.Log.d("HomeAssistantSkill", "handleSetState - action: '$action', entityId: '${mapping.entityId}'")
         val domain = mapping.entityId.substringBefore(".")
-        android.util.Log.d("HomeAssistantSkill", "Domain: '$domain'")
-        val parsedAction = parseAction(action, domain)
-        if (parsedAction == null) {
-            android.util.Log.e("HomeAssistantSkill", "Failed to parse action: '$action'")
-            return HomeAssistantOutput.InvalidAction(action.ifEmpty { "<empty>" }, domain)
-        }
-        android.util.Log.d("HomeAssistantSkill", "Parsed action: service='${parsedAction.service}', spokenForm='${parsedAction.spokenForm}'")
-        
+
+        // Map generic on/off services to domain-specific equivalents
+        // (e.g. cover uses open_cover/close_cover, lock uses lock/unlock)
         val service = when (domain) {
             "cover" -> when (parsedAction.service) {
                 "turn_on" -> "open_cover"
@@ -140,6 +153,7 @@ class HomeAssistantSkill(
     }
 
     private suspend fun handleSelectSource(
+        ctx: SkillContext,
         settings: SkillSettingsHomeAssistant,
         mapping: EntityMapping,
         requestedSource: String
@@ -162,9 +176,13 @@ class HomeAssistantSkill(
         // Convert to list
         val sourceList = (0 until sourceListJson.length())
             .map { sourceListJson.getString(it) }
-        
-        // Fuzzy match requested source
-        val matchedSource = findBestSourceMatch(requestedSource, sourceList)
+
+        // Use dicio-numbers to convert spoken number words to digits (e.g. "two" -> "2").
+        // Note: homophone variations (e.g. "too" -> "2") are not yet supported by dicio-numbers.
+        val normalizedSource = normalizeNumberWords(ctx, requestedSource)
+
+        // Fuzzy match using StringUtils.customStringDistance (Levenshtein-based)
+        val matchedSource = findBestSourceMatch(normalizedSource, sourceList)
             ?: return HomeAssistantOutput.SourceNotFound(
                 requestedSource,
                 mapping.friendlyName
@@ -187,79 +205,41 @@ class HomeAssistantSkill(
         )
     }
 
-    private fun generateNumberVariations(input: String): List<String> {
-        // Map number words to their digit and homophone variations
-        val numberMappings = mapOf(
-            "one" to listOf("1", "won"),
-            "two" to listOf("2", "to", "too"),
-            "three" to listOf("3"),
-            "four" to listOf("4", "for", "fore"),
-            "five" to listOf("5"),
-            "six" to listOf("6"),
-            "seven" to listOf("7"),
-            "eight" to listOf("8", "ate"),
-            "nine" to listOf("9"),
-            "ten" to listOf("10")
-        )
-        
-        // Build reverse map: homophone -> (number word, all variations)
-        val reverseMap = mutableMapOf<String, Pair<String, List<String>>>()
-        for ((word, variations) in numberMappings) {
-            reverseMap[word] = word to (listOf(word) + variations)
-            for (variation in variations) {
-                reverseMap[variation] = word to (listOf(word) + variations)
+    /**
+     * Uses dicio-numbers [ParserFormatter] to convert spoken number words to their digit form.
+     * For example, "BBC Radio two" becomes "BBC Radio 2".
+     * Falls back to the original input if no parser is available for the current locale.
+     */
+    private fun normalizeNumberWords(ctx: SkillContext, input: String): String {
+        val pf = ctx.parserFormatter ?: return input
+        val parts = pf.extractNumber(input).parseMixedWithText()
+        return parts.joinToString("") { part ->
+            when (part) {
+                is Number -> part.integerValue().toString()
+                else -> part.toString()
             }
-        }
-        
-        val variations = mutableListOf(input)
-        
-        // Find all number words or homophones in input
-        for ((trigger, pair) in reverseMap) {
-            val regex = Regex("\\b$trigger\\b", RegexOption.IGNORE_CASE)
-            if (regex.containsMatchIn(input)) {
-                val (_, allVariations) = pair
-                for (replacement in allVariations) {
-                    if (replacement.lowercase() != trigger.lowercase()) {
-                        variations.add(regex.replace(input, replacement))
-                    }
-                }
-            }
-        }
-        
-        return variations.distinct()
+        }.trim()
     }
 
+    /**
+     * Finds the best matching source from [available] for the [requested] source name,
+     * using [StringUtils.customStringDistance] (Levenshtein-based with subsequence bonuses).
+     * Returns null if no source is close enough.
+     */
     private fun findBestSourceMatch(requested: String, available: List<String>): String? {
-        val variations = generateNumberVariations(requested)
-        
-        // 1. Try exact match with each variation
-        for (variation in variations) {
-            val normalized = variation.lowercase().trim()
-            available.firstOrNull { it.lowercase() == normalized }?.let { return it }
-        }
-        
-        // 2. Fuzzy match with all variations (skip contains - too greedy for short words)
-        val allMatches = variations.flatMap { variation ->
-            val normalized = variation.lowercase().trim()
-            available.mapIndexed { index, source ->
-                Triple(source, calculateSimilarity(normalized, source.lowercase()), index)
-            }
-        }
-        
-        val scored = allMatches.filter { it.second >= 0.4 }
-        
-        // Prefer higher similarity, then shorter match, then earlier in list
-        return scored.maxWithOrNull(
-            compareBy({ it.second }, { -it.first.length }, { -it.third })
-        )?.first
-    }
+        // Try exact match first (case-insensitive)
+        val normalized = requested.lowercase().trim()
+        available.firstOrNull { it.lowercase() == normalized }?.let { return it }
 
-    private fun calculateSimilarity(s1: String, s2: String): Double {
-        val words1 = s1.split(Regex("\\s+")).toSet()
-        val words2 = s2.split(Regex("\\s+")).toSet()
-        val intersection = words1.intersect(words2).size
-        val union = words1.union(words2).size
-        return if (union > 0) intersection.toDouble() / union else 0.0
+        // Use StringUtils.customStringDistance — lower is better.
+        // The threshold scales with input length but is capped to avoid false positives
+        // on short inputs matching long source names.
+        val maxAcceptableDistance = (normalized.length / 3).coerceAtLeast(2)
+        return available
+            .map { it to StringUtils.customStringDistance(normalized, it) }
+            .filter { it.second <= maxAcceptableDistance }
+            .minByOrNull { it.second }
+            ?.first
     }
 
     private fun findBestMatch(spokenName: String, mappings: List<EntityMapping>): EntityMapping? {
@@ -273,11 +253,15 @@ class HomeAssistantSkill(
         }
     }
 
+    /**
+     * Represents a validated action parsed from user input.
+     * @property service the HA service name (e.g. "turn_on", "turn_off", "toggle")
+     * @property spokenForm the human-readable form shown in output (e.g. "on", "off", "toggled")
+     */
     private data class ParsedAction(val service: String, val spokenForm: String)
 
     private fun parseAction(action: String, domain: String): ParsedAction? {
         val normalized = action.lowercase().trim()
-        android.util.Log.d("HomeAssistantSkill", "parseAction - input: '$action', normalized: '$normalized'")
         
         return when {
             normalized.contains("on") || normalized in listOf("open", "unlock", "enable") ->

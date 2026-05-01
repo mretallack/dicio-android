@@ -1,89 +1,61 @@
 package org.stypox.dicio.skills.homeassistant
 
 import io.kotest.core.spec.style.StringSpec
-import io.kotest.matchers.collections.shouldContain
-import io.kotest.matchers.collections.shouldHaveSize
-import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
+import org.dicio.numbers.ParserFormatter
+import org.dicio.skill.context.SkillContext
+import org.dicio.skill.context.SpeechOutputDevice
+import org.dicio.skill.skill.SkillOutput
+import org.dicio.skill.standard.util.MatchHelper
 import org.stypox.dicio.sentences.Sentences
+import java.util.Locale
 
+/**
+ * Tests for normalizeNumberWords which uses dicio-numbers [ParserFormatter]
+ * to convert spoken number words to digits (e.g. "two" -> "2").
+ *
+ * Note: homophone variations (e.g. "too" -> "2") are not supported by dicio-numbers
+ * and would need to be handled at the dicio-numbers level in the future.
+ */
 class NumberVariationsTest : StringSpec({
-    
+
     val skill = HomeAssistantSkill(HomeAssistantInfo, Sentences.HomeAssistant["en"]!!)
-    
-    // Use reflection to access private method
-    val generateNumberVariations = skill.javaClass.getDeclaredMethod(
-        "generateNumberVariations",
+
+    // Access private normalizeNumberWords via reflection
+    val normalizeNumberWords = skill.javaClass.getDeclaredMethod(
+        "normalizeNumberWords",
+        SkillContext::class.java,
         String::class.java
     ).apply { isAccessible = true }
-    
-    fun generate(input: String): List<String> {
-        @Suppress("UNCHECKED_CAST")
-        return generateNumberVariations.invoke(skill, input) as List<String>
+
+    // Create a SkillContext with a real ParserFormatter for English
+    val ctx = object : SkillContext {
+        override val parserFormatter = ParserFormatter(Locale.ENGLISH)
+        override var standardMatchHelper: MatchHelper? = null
+        override val android get() = throw NotImplementedError()
+        override val locale get() = Locale.ENGLISH
+        override val sentencesLanguage get() = "en"
+        override val speechOutputDevice: SpeechOutputDevice get() = throw NotImplementedError()
+        override val previousOutput: SkillOutput get() = throw NotImplementedError()
     }
-    
-    "single number word - two" {
-        val result = generate("BBC Radio two")
-        result shouldContain "BBC Radio two"
-        result shouldContain "BBC Radio 2"
-        result shouldContain "BBC Radio to"
-        result shouldContain "BBC Radio too"
-        result shouldHaveSize 4
+
+    fun normalize(input: String): String {
+        return normalizeNumberWords.invoke(skill, ctx, input) as String
     }
-    
-    "single number word - four" {
-        val result = generate("BBC Radio four")
-        result shouldContain "BBC Radio four"
-        result shouldContain "BBC Radio 4"
-        result shouldContain "BBC Radio for"
-        result shouldContain "BBC Radio fore"
-        result shouldHaveSize 4
+
+    "number word - two becomes 2" {
+        normalize("BBC Radio two") shouldBe "BBC Radio 2"
     }
-    
-    "single number word - eight" {
-        val result = generate("Radio eight")
-        result shouldContain "Radio eight"
-        result shouldContain "Radio 8"
-        result shouldContain "Radio ate"
-        result shouldHaveSize 3
+
+    "number word - four becomes 4" {
+        normalize("BBC Radio four") shouldBe "BBC Radio 4"
     }
-    
-    "no number words" {
-        val result = generate("BBC Radio")
-        result shouldBe listOf("BBC Radio")
+
+    "no number words - unchanged" {
+        normalize("BBC Radio") shouldBe "BBC Radio"
     }
-    
-    "multiple numbers" {
-        val result = generate("one two")
-        result shouldContain "one two"
-        result shouldContain "1 two"
-        result shouldContain "won two"
-        result shouldContain "one 2"
-        result shouldContain "one to"
-        result shouldContain "one too"
-        result.size shouldBeGreaterThan 5
-    }
-    
-    "case insensitive" {
-        val result = generate("BBC Radio Two")
-        result shouldContain "BBC Radio Two"
-        result shouldContain "BBC Radio 2"
-        result shouldContain "BBC Radio to"
-        result shouldContain "BBC Radio too"
-    }
-    
-    "number at start" {
-        val result = generate("two BBC Radio")
-        result shouldContain "2 BBC Radio"
-        result shouldContain "to BBC Radio"
-        result shouldContain "too BBC Radio"
-    }
-    
-    "all number words have variations" {
-        val numbers = listOf("one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten")
-        for (number in numbers) {
-            val result = generate("Radio $number")
-            result.size shouldBeGreaterThan 1
-        }
+
+    "number word at start" {
+        normalize("two BBC Radio") shouldBe "2 BBC Radio"
     }
 })

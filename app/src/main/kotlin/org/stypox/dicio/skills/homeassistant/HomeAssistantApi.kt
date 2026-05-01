@@ -1,37 +1,37 @@
 package org.stypox.dicio.skills.homeassistant
 
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
-import org.stypox.dicio.util.ConnectionUtils
 import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.URL
 
 object HomeAssistantApi {
+    private val client = OkHttpClient()
+    private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
+
     @Throws(IOException::class)
     suspend fun getAllStates(baseUrl: String, token: String): JSONArray {
-        val connection = URL("$baseUrl/api/states").openConnection() as HttpURLConnection
-        connection.setRequestProperty("Authorization", "Bearer $token")
-        connection.setRequestProperty("Content-Type", "application/json")
-        
-        val scanner = java.util.Scanner(connection.inputStream)
-        val response = scanner.useDelimiter("\\A").next()
-        scanner.close()
-        
-        return JSONArray(response)
+        val body = executeRequest(
+            Request.Builder()
+                .url("$baseUrl/api/states")
+                .addHeader("Authorization", "Bearer $token")
+                .build()
+        )
+        return JSONArray(body)
     }
 
     @Throws(IOException::class)
     suspend fun getEntityState(baseUrl: String, token: String, entityId: String): JSONObject {
-        val connection = URL("$baseUrl/api/states/$entityId").openConnection() as HttpURLConnection
-        connection.setRequestProperty("Authorization", "Bearer $token")
-        connection.setRequestProperty("Content-Type", "application/json")
-        
-        val scanner = java.util.Scanner(connection.inputStream)
-        val response = scanner.useDelimiter("\\A").next()
-        scanner.close()
-        
-        return JSONObject(response)
+        val body = executeRequest(
+            Request.Builder()
+                .url("$baseUrl/api/states/$entityId")
+                .addHeader("Authorization", "Bearer $token")
+                .build()
+        )
+        return JSONObject(body)
     }
 
     @Throws(IOException::class)
@@ -43,21 +43,24 @@ object HomeAssistantApi {
         entityId: String,
         extraParams: Map<String, String> = emptyMap()
     ): JSONArray {
-        val connection = URL("$baseUrl/api/services/$domain/$service").openConnection() as HttpURLConnection
-        connection.requestMethod = "POST"
-        connection.setRequestProperty("Authorization", "Bearer $token")
-        connection.setRequestProperty("Content-Type", "application/json")
-        connection.doOutput = true
-        
-        val body = JSONObject().put("entity_id", entityId)
-        extraParams.forEach { (key, value) -> body.put(key, value) }
-        
-        connection.outputStream.write(body.toString().toByteArray())
-        
-        val scanner = java.util.Scanner(connection.inputStream)
-        val response = scanner.useDelimiter("\\A").next()
-        scanner.close()
-        
-        return JSONArray(response)
+        val jsonBody = JSONObject().put("entity_id", entityId)
+        extraParams.forEach { (key, value) -> jsonBody.put(key, value) }
+
+        val body = executeRequest(
+            Request.Builder()
+                .url("$baseUrl/api/services/$domain/$service")
+                .addHeader("Authorization", "Bearer $token")
+                .post(jsonBody.toString().toRequestBody(JSON_MEDIA_TYPE))
+                .build()
+        )
+        return JSONArray(body)
+    }
+
+    private fun executeRequest(request: Request): String {
+        val response = client.newCall(request).execute()
+        return response.use {
+            if (!it.isSuccessful) throw IOException("HTTP ${it.code}: ${it.message}")
+            it.body?.string() ?: throw IOException("Empty response body")
+        }
     }
 }

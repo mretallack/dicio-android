@@ -8,6 +8,11 @@ import org.dicio.skill.skill.SkillOutput
 import org.dicio.skill.standard.util.MatchHelper
 import java.util.Locale
 
+/**
+ * SkillContext for sentence scoring tests that need a [MatchHelper] initialized with input text.
+ * Unlike [org.stypox.dicio.MockSkillContext] (which throws on all properties), this provides
+ * a working [standardMatchHelper] so that [StandardRecognizerData.score] can be called.
+ */
 class TestSkillContext(input: String) : SkillContext {
     override var standardMatchHelper: MatchHelper? = MatchHelper(null, input)
     override val parserFormatter: ParserFormatter? = null
