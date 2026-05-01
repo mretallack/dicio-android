@@ -136,7 +136,7 @@ skills:
             type: string
 
   - id: home_assistant
-    specificity: high
+    specificity: medium
     sentences:
       - id: get_status
         captures:

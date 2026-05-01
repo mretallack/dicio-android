@@ -1,8 +1,8 @@
 package org.stypox.dicio.skills.homeassistant
 
 import android.content.Context
-import android.content.Intent
 import android.net.Uri
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -46,6 +46,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.dataStore
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.dicio.skill.context.SkillContext
@@ -54,6 +55,8 @@ import org.dicio.skill.skill.SkillInfo
 import org.stypox.dicio.R
 import org.stypox.dicio.sentences.Sentences
 import org.stypox.dicio.settings.ui.StringSetting
+
+private const val TAG = "HomeAssistantInfo"
 
 object HomeAssistantInfo : SkillInfo("home_assistant") {
     override fun name(context: Context) =
@@ -94,16 +97,16 @@ object HomeAssistantInfo : SkillInfo("home_assistant") {
             ).Render(
                 value = data.baseUrl,
                 onValueChange = { baseUrl ->
-                    android.util.Log.d("HomeAssistant", "Saving base URL: $baseUrl")
-                    kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+                    Log.d(TAG, "Saving base URL: $baseUrl")
+                    GlobalScope.launch(Dispatchers.IO) {
                         try {
                             dataStore.updateData {
-                                android.util.Log.d("HomeAssistant", "DataStore update started")
+                                Log.d(TAG, "DataStore update started")
                                 it.toBuilder().setBaseUrl(baseUrl).build()
                             }
-                            android.util.Log.d("HomeAssistant", "DataStore update completed")
+                            Log.d(TAG, "DataStore update completed")
                         } catch (e: Exception) {
-                            android.util.Log.e("HomeAssistant", "Failed to save base URL", e)
+                            Log.e(TAG, "Failed to save base URL", e)
                         }
                     }
                 }
@@ -114,16 +117,16 @@ object HomeAssistantInfo : SkillInfo("home_assistant") {
             ).Render(
                 value = data.accessToken,
                 onValueChange = { token ->
-                    android.util.Log.d("HomeAssistant", "Saving access token (length: ${token.length})")
-                    kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+                    Log.d(TAG, "Saving access token (length: ${token.length})")
+                    GlobalScope.launch(Dispatchers.IO) {
                         try {
                             dataStore.updateData {
-                                android.util.Log.d("HomeAssistant", "DataStore update started")
+                                Log.d(TAG, "DataStore update started")
                                 it.toBuilder().setAccessToken(token).build()
                             }
-                            android.util.Log.d("HomeAssistant", "DataStore update completed")
+                            Log.d(TAG, "DataStore update completed")
                         } catch (e: Exception) {
-                            android.util.Log.e("HomeAssistant", "Failed to save access token", e)
+                            Log.e(TAG, "Failed to save access token", e)
                         }
                     }
                 }
@@ -137,21 +140,6 @@ object HomeAssistantInfo : SkillInfo("home_assistant") {
                     scope.launch {
                         dataStore.updateData {
                             it.toBuilder().clearEntityMappings().addAllEntityMappings(mappings).build()
-                        }
-                    }
-                },
-                onExport = { baseUrl, accessToken, mappings ->
-                    scope.launch {
-                        try {
-                            val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
-                                addCategory(Intent.CATEGORY_OPENABLE)
-                                type = "text/yaml"
-                                putExtra(Intent.EXTRA_TITLE, "home_assistant_config.yaml")
-                            }
-                            // Note: In a real implementation, you'd need to handle the file creation
-                            // through an activity result launcher
-                        } catch (e: Exception) {
-                            e.printStackTrace()
                         }
                     }
                 },
@@ -185,7 +173,6 @@ fun EntityMappingsEditor(
     baseUrl: String,
     accessToken: String,
     onMappingsChange: (List<EntityMapping>) -> Unit,
-    onExport: (String, String, List<EntityMapping>) -> Unit,
     onImport: (HomeAssistantYamlUtils.YamlHomeAssistantConfig) -> Unit
 ) {
     var showDialog by remember { mutableStateOf(false) }

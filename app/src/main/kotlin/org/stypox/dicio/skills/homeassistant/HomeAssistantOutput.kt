@@ -238,7 +238,10 @@ sealed interface HomeAssistantOutput : SkillOutput {
                     modifier = Modifier.fillMaxWidth()
                 )
                 Text(
-                    text = "\"$requestedSource\"",
+                    text = ctx.getString(
+                        R.string.skill_homeassistant_source_not_found_quoted,
+                        requestedSource
+                    ),
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.error,
