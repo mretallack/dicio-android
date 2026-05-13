@@ -7,6 +7,8 @@ import org.dicio.skill.skill.SkillInfo
 import org.dicio.skill.skill.SkillOutput
 import org.dicio.skill.standard.StandardRecognizerData
 import org.dicio.skill.standard.StandardRecognizerSkill
+import org.json.JSONArray
+import org.json.JSONObject
 import org.stypox.dicio.sentences.Sentences.HomeAssistant
 import org.stypox.dicio.skills.homeassistant.HomeAssistantInfo.homeAssistantDataStore
 import org.stypox.dicio.util.StringUtils
@@ -73,6 +75,17 @@ class HomeAssistantSkill(
                         ?: return HomeAssistantOutput.EntityNotMapped(entityName)
                     handleSelectSource(ctx, settings, mapping, sourceName)
                 }
+                is HomeAssistant.VacuumRoom -> {
+                    val roomNames = mutableListOf<String>()
+                    inputData.roomNames?.trim()?.let { if (it.isNotEmpty()) roomNames.add(it) }
+                    inputData.roomNames2?.trim()?.let { if (it.isNotEmpty()) roomNames.add(it) }
+                    if (roomNames.isEmpty()) return HomeAssistantOutput.VacuumRoomNotFound("", emptyList())
+                    handleVacuumRoom(settings, roomNames)
+                }
+                is HomeAssistant.VacuumStart -> handleVacuumCommand(settings, "start")
+                is HomeAssistant.VacuumStop -> handleVacuumCommand(settings, "stop")
+                is HomeAssistant.VacuumPause -> handleVacuumCommand(settings, "pause")
+                is HomeAssistant.VacuumDock -> handleVacuumCommand(settings, "return_to_base")
             }
         // Only catch exceptions we can meaningfully handle; let unrecognized
         // exceptions propagate so Dicio's infrastructure shows the error to the user.
@@ -238,6 +251,98 @@ class HomeAssistantSkill(
         return available
             .map { it to StringUtils.customStringDistance(normalized, it) }
             .filter { it.second <= maxAcceptableDistance }
+            .minByOrNull { it.second }
+            ?.first
+    }
+
+    private fun findVacuumEntity(mappings: List<EntityMapping>): EntityMapping? {
+        return mappings.firstOrNull { it.entityId.startsWith("vacuum.") }
+    }
+
+    private suspend fun handleVacuumRoom(
+        settings: SkillSettingsHomeAssistant,
+        spokenRoomNames: List<String>
+    ): SkillOutput {
+        val vacuumMapping = findVacuumEntity(settings.entityMappingsList)
+            ?: return HomeAssistantOutput.VacuumNotConfigured()
+
+        val state = HomeAssistantApi.getEntityState(
+            settings.baseUrl, settings.accessToken, vacuumMapping.entityId
+        )
+        val rooms = parseRooms(state.optJSONObject("attributes"))
+        if (rooms.isEmpty()) return HomeAssistantOutput.VacuumRoomNotFound("", emptyList())
+
+        val matchedRooms = mutableListOf<Pair<Int, String>>()
+        for (spoken in spokenRoomNames) {
+            val matched = matchRoomName(spoken, rooms)
+            if (matched != null) {
+                matchedRooms.add(matched.id to matched.name)
+            } else {
+                return HomeAssistantOutput.VacuumRoomNotFound(spoken, rooms.map { it.name })
+            }
+        }
+
+        val segmentIds = matchedRooms.map { it.first }
+        val body = JSONObject()
+            .put("entity_id", vacuumMapping.entityId)
+            .put("segments", JSONArray(segmentIds))
+
+        HomeAssistantApi.callServiceWithBody(
+            settings.baseUrl, settings.accessToken,
+            "dreame_vacuum", "vacuum_clean_segment", body
+        )
+
+        return HomeAssistantOutput.VacuumRoomSuccess(matchedRooms.map { it.second })
+    }
+
+    private suspend fun handleVacuumCommand(
+        settings: SkillSettingsHomeAssistant,
+        service: String
+    ): SkillOutput {
+        val vacuumMapping = findVacuumEntity(settings.entityMappingsList)
+            ?: return HomeAssistantOutput.VacuumNotConfigured()
+
+        HomeAssistantApi.callService(
+            settings.baseUrl, settings.accessToken,
+            "vacuum", service, vacuumMapping.entityId
+        )
+
+        val action = when (service) {
+            "start" -> "started"
+            "stop" -> "stopped"
+            "pause" -> "paused"
+            "return_to_base" -> "sent home"
+            else -> service
+        }
+        return HomeAssistantOutput.VacuumCommandSuccess(action)
+    }
+
+    internal data class RoomInfo(val id: Int, val name: String)
+
+    private fun parseRooms(attributes: JSONObject?): List<RoomInfo> {
+        val roomsObj = attributes?.optJSONObject("rooms") ?: return emptyList()
+        val result = mutableListOf<RoomInfo>()
+        for (mapName in roomsObj.keys()) {
+            val roomArray = roomsObj.optJSONArray(mapName) ?: continue
+            for (i in 0 until roomArray.length()) {
+                val room = roomArray.optJSONObject(i) ?: continue
+                result.add(RoomInfo(room.getInt("id"), room.getString("name")))
+            }
+        }
+        return result
+    }
+
+    internal fun matchRoomName(spoken: String, rooms: List<RoomInfo>): RoomInfo? {
+        val normalized = spoken.lowercase().trim()
+        // Exact match
+        rooms.firstOrNull { it.name.lowercase() == normalized }?.let { return it }
+        // Contains match
+        rooms.firstOrNull { it.name.lowercase().contains(normalized) || normalized.contains(it.name.lowercase()) }?.let { return it }
+        // Fuzzy match
+        val maxDistance = (normalized.length / 3).coerceAtLeast(2)
+        return rooms
+            .map { it to StringUtils.customStringDistance(normalized, it.name.lowercase()) }
+            .filter { it.second <= maxDistance }
             .minByOrNull { it.second }
             ?.first
     }

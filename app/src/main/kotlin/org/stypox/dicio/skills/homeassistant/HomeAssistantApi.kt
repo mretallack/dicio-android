@@ -56,6 +56,24 @@ object HomeAssistantApi {
         return JSONArray(body)
     }
 
+    @Throws(IOException::class)
+    suspend fun callServiceWithBody(
+        baseUrl: String,
+        token: String,
+        domain: String,
+        service: String,
+        body: JSONObject
+    ): JSONArray {
+        val responseBody = executeRequest(
+            Request.Builder()
+                .url("$baseUrl/api/services/$domain/$service")
+                .addHeader("Authorization", "Bearer $token")
+                .post(body.toString().toRequestBody(JSON_MEDIA_TYPE))
+                .build()
+        )
+        return JSONArray(responseBody)
+    }
+
     private fun executeRequest(request: Request): String {
         val response = client.newCall(request).execute()
         return response.use {

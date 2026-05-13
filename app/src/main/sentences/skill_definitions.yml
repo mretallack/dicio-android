@@ -164,4 +164,14 @@ skills:
             type: string
           - id: source_name
             type: string
+      - id: vacuum_room
+        captures:
+          - id: room_names
+            type: string
+          - id: room_names2
+            type: string
+      - id: vacuum_start
+      - id: vacuum_stop
+      - id: vacuum_pause
+      - id: vacuum_dock
       - id: get_help
