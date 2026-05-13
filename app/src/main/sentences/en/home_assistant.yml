@@ -19,6 +19,24 @@ select_source:
   - turn|switch|set|tune|change the? .entity_name. to .source_name.
   - tune|set the? .entity_name. on .source_name.
 
+vacuum_room:
+  - vacuum|clean|hoover the? .room_names. and .room_names2.
+  - vacuum|clean|hoover the? .room_names.
+
+vacuum_start:
+  - start the? vacuum|hoover|robot
+
+vacuum_stop:
+  - stop the? vacuum|hoover|robot
+
+vacuum_pause:
+  - pause the? vacuum|hoover|robot
+
+vacuum_dock:
+  - send the? vacuum|hoover|robot home|back
+  - dock the? vacuum|hoover|robot
+  - return the? vacuum|hoover|robot
+
 get_help:
   - home assistant help
   - help|how with|for home assistant

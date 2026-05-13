@@ -278,4 +278,32 @@ sealed interface HomeAssistantOutput : SkillOutput {
             }
         }
     }
+
+    data class VacuumRoomSuccess(
+        val rooms: List<String>
+    ) : HomeAssistantOutput, HeadlineSpeechSkillOutput {
+        override fun getSpeechOutput(ctx: SkillContext): String =
+            "Vacuuming ${rooms.joinToString(" and ")}"
+    }
+
+    data class VacuumCommandSuccess(
+        val action: String
+    ) : HomeAssistantOutput, HeadlineSpeechSkillOutput {
+        override fun getSpeechOutput(ctx: SkillContext): String =
+            "Vacuum $action"
+    }
+
+    data class VacuumRoomNotFound(
+        val spokenName: String,
+        val availableRooms: List<String>
+    ) : HomeAssistantOutput, HeadlineSpeechSkillOutput {
+        override fun getSpeechOutput(ctx: SkillContext): String =
+            if (availableRooms.isEmpty()) "Vacuum has no room map"
+            else "Room $spokenName not found. Available: ${availableRooms.joinToString(", ")}"
+    }
+
+    class VacuumNotConfigured : HomeAssistantOutput, HeadlineSpeechSkillOutput {
+        override fun getSpeechOutput(ctx: SkillContext): String =
+            "No vacuum entity configured"
+    }
 }
