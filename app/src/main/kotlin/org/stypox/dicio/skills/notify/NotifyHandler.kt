@@ -1,13 +1,25 @@
 package org.stypox.dicio.skills.notify
 
 import android.service.notification.NotificationListenerService
+import android.service.notification.StatusBarNotification
 import android.util.Log
+import dagger.hilt.android.AndroidEntryPoint
+import org.stypox.dicio.di.WakeDeviceWrapper
+import org.stypox.dicio.io.wake.WakeService
+import javax.inject.Inject
 
-open class NotifyHandler: NotificationListenerService() {
+@AndroidEntryPoint
+class NotifyHandler: NotificationListenerService() {
     companion object Companion {
         private const val TAG: String = "NotifyHandler"
+        private const val WATCHDOG_INTERVAL_MS = 30_000L
         var Instance: NotifyHandler? = null
     }
+
+    @Inject
+    lateinit var wakeDevice: WakeDeviceWrapper
+
+    private var lastWatchdogCheck = 0L
 
     override fun onCreate() {
         super.onCreate()
@@ -17,6 +29,28 @@ open class NotifyHandler: NotificationListenerService() {
     override fun onDestroy() {
         super.onDestroy()
         Instance = null
+    }
+
+    override fun onNotificationPosted(sbn: StatusBarNotification?) {
+        super.onNotificationPosted(sbn)
+        checkWakeService()
+    }
+
+    override fun onNotificationRemoved(sbn: StatusBarNotification?) {
+        super.onNotificationRemoved(sbn)
+        checkWakeService()
+    }
+
+    private fun checkWakeService() {
+        val now = System.currentTimeMillis()
+        if (now - lastWatchdogCheck < WATCHDOG_INTERVAL_MS) return
+        lastWatchdogCheck = now
+
+        // Only restart if a wake device is configured and the service isn't running
+        if (wakeDevice.state.value != null && !WakeService.isRunning()) {
+            Log.w(TAG, "WakeService not running, restarting")
+            WakeService.start(this)
+        }
     }
 
     fun getActiveNotificationsList(): List<Notification> {
